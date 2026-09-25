@@ -1,0 +1,19 @@
+# Danh bạ team — nguồn sự thật cho email + Discord ID.
+# Mọi người phải nằm trong danh sách "users:" (không tạo key khác).
+users:
+  - display_name: "Minh" # tên dùng trong lệnh NL ("assign cho Minh")
+    full_name: "Chủ dự án"
+    email: "songminh688@gmail.com"
+    discord_id: "661748766990270465" # Discord user ID của bạn
+    notion_user_id: "3a1d872b-594c-81b8-bf14-0002673b336a" # account "SEE Club" trong Notion workspace (email Notion: see.club@vgu.edu.vn)
+    role: admin
+    prefs:
+      email: true
+      discord_dm: true
+  - display_name: "Cường"
+    full_name: "Trương Phước Minh Cường"
+    email: "10523006@student.vgu.edu.vn"
+    discord_id: "351176931997384704"
+    notion_user_id: ""
+    role: member
+    prefs: { email: true, discord_dm: true }

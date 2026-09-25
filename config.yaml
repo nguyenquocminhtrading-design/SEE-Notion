@@ -1,0 +1,24 @@
+# Cấu hình nghiệp vụ SEE Notion
+timezone: Asia/Ho_Chi_Minh
+
+# Nhắc hạn: rule_key phát khi (deadline - offset_days) rơi vào hôm nay
+# overN = quá hạn, lặp lại mỗi 3 ngày
+reminder_rules:
+  pre3:  {offset_days: -3, channels: [email]}
+  pre1:  {offset_days: -1, channels: [email, discord_dm]}
+  due:   {offset_days: 0,  channels: [email, discord_dm]}
+  over1: {offset_days: 1,  channels: [email, discord_dm]}
+  over3: {offset_days: 4,  channels: [email, discord_dm]}   # quá hạn 4 ngày
+  over6: {offset_days: 7,  channels: [email, discord_dm]}   # quá hạn 7 ngày
+
+# Cửa sổ quét reminder (ngày): soi deadline từ quá khứ -> tương lai
+scan_window_past_days: 30
+scan_window_future_days: 4
+
+# Hành động chờ xác nhận
+pending_action_ttl_minutes: 10
+
+# Giới hạn
+max_command_length: 2000
+commands_per_minute_per_user: 20
+notion_max_rps: 2.5
