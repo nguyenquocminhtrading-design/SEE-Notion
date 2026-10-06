@@ -18,7 +18,7 @@ users:
     role: member
     prefs: { email: true, discord_dm: true }
   - display_name: "Hân"
-    full_name: "Hoàng Gia Hân"
+    full_name: "Hàng Gia Hân"
     email: "10623011@student.vgu.edu.vn"
     discord_id: ""
     notion_user_id: ""
