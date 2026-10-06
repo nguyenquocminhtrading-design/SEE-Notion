@@ -17,17 +17,31 @@ users:
     notion_user_id: ""
     role: member
     prefs: { email: true, discord_dm: true }
-    - display_name: "Hân"
+  - display_name: "Hân"
     full_name: "Hàng gia Hân "
     email: "10623011@student.vgu.edu.vn"
     discord_id: ""
-    notion_user_id: ""
+    notion_user_id: "1ebd872b594c815d84d00002a121c87c"
     role: member
     prefs: { email: true, discord_dm: true }
-    - display_name: "Ánh "
+  - display_name: "Ánh "
     full_name: "Hồng Ánh "
     email: "10725018@student.vgu.edu.vn"
     discord_id: ""
-    notion_user_id: ""
+    notion_user_id: "3e6d872b594c81449c1e000211ff8e86"
+    role: member
+    prefs: { email: true, discord_dm: true }
+  - display_name: "Khôi "
+    full_name: "Lê Quang khôi "
+    email: "11525023@student.vgu.edu.vn"
+    discord_id: ""
+    notion_user_id: "3f1d872b594c8130805f0002fb858cd2"
+    role: member
+    prefs: { email: true, discord_dm: true }
+  - display_name: "Yến "
+    full_name: "Nguyễn Thị Hồng Yến
+    email: "10725019@student.vgu.edu.vn"
+    discord_id: ""
+    notion_user_id: "3f1d872b594c81229d0900027e7b8166"
     role: member
     prefs: { email: true, discord_dm: true }
