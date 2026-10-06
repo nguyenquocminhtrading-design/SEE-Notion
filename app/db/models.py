@@ -19,7 +19,7 @@ class User(Base):
     display_name: Mapped[str] = mapped_column(Text, nullable=False)
     full_name: Mapped[str] = mapped_column(Text, default="")
     email: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
-    discord_id: Mapped[str] = mapped_column(Text, default="", unique=True)
+    discord_id: Mapped[str | None] = mapped_column(Text, default=None, unique=True, nullable=True)
     notion_user_id: Mapped[str] = mapped_column(Text, default="")
     role: Mapped[str] = mapped_column(Text, default="member")  # admin|member|viewer
     prefs_json: Mapped[str] = mapped_column(Text, default="{}")

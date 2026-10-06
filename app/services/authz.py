@@ -41,7 +41,10 @@ def seed_users_from_yaml(session: Session) -> int:
     for entry in load_team():
         display_name = str(entry["display_name"]).strip()
         email = str(entry["email"]).strip()
-        discord_id = str(entry.get("discord_id", "")).strip()
+        discord_id = str(entry.get("discord_id", "")).strip() or None
+        if not discord_id:
+            log.warning("User %s (%s) KHÔNG CÓ discord_id trong team.yaml — chỉ dùng email/Notion, ko nhận DM Discord",
+                        display_name, email)
         prefs = entry.get("prefs", {})
         existing = None
         if discord_id:
@@ -72,7 +75,9 @@ def seed_users_from_yaml(session: Session) -> int:
             ))
         count += 1
     session.commit()
-    log.info("Đã seed %d user từ team.yaml", count)
+    users_with_discord = sum(1 for e in load_team() if str(e.get("discord_id", "")).strip())
+    users_without = count - users_with_discord
+    log.info("Seed summary: %d user có discord_id, %d user chỉ email/Notion (không nhận DM Discord)", users_with_discord, users_without)
     return count
 
 
