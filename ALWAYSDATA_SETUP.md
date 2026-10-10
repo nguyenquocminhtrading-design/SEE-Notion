@@ -1,3 +1,16 @@
+ssh seecodenotion@ssh-seecodenotion.alwaysdata.net
+
+ssh seecodenotion@ssh-seecodenotion.alwaysdata.net
+
+ssh seecodenotion@ssh-seecodenotion.alwaysdata.net
+
+ssh seecodenotion@ssh-seecodenotion.alwaysdata.net
+
+```bash
+ssh seecodenotion@ssh-seecodenotion.alwaysdata.net
+```
+
+
 # Hướng Dẫn Deploy Bot Lên AlwaysData Miễn Phí 100%
 
 AlwaysData là một dịch vụ tuyệt vời cho bot nhỏ vì nó **miễn phí vĩnh viễn**, cho phép lưu dữ liệu cố định (ổ cứng 100MB) và hỗ trợ chạy ngầm 24/7.
@@ -6,11 +19,13 @@ AlwaysData là một dịch vụ tuyệt vời cho bot nhỏ vì nó **miễn ph
 ---
 
 ## Bước 1: Đăng ký tài khoản và User SSH
+
 1. Tạo tài khoản AlwaysData và tạo User SSH thành công (tên user là `seecodenotion`).
 
 ---
 
 ## Bước 2: Kết nối SSH và Tải Code
+
 1. Mở CMD (Command Prompt) trên máy tính Windows của bạn và kết nối vào máy chủ bằng lệnh:
    ```bash
    ssh seecodenotion@ssh-seecodenotion.alwaysdata.net
@@ -20,13 +35,14 @@ AlwaysData là một dịch vụ tuyệt vời cho bot nhỏ vì nó **miễn ph
    ```bash
    cd /home/seecodenotion/SEE-Notion
    ```
-4. **Cực kỳ quan trọng:** Bạn cần tạo file `.env` và `team.yaml` trên này (vì Github không cho phép đẩy file `.env` lên). 
-   Dùng lệnh `nano .env` để tạo và dán nội dung `.env` từ máy tính vào, sau đó bấm `Ctrl + X`, nhấn `Y`, nhấn `Enter` để lưu. 
+4. **Cực kỳ quan trọng:** Bạn cần tạo file `.env` và `team.yaml` trên này (vì Github không cho phép đẩy file `.env` lên).
+   Dùng lệnh `nano .env` để tạo và dán nội dung `.env` từ máy tính vào, sau đó bấm `Ctrl + X`, nhấn `Y`, nhấn `Enter` để lưu.
    Làm tương tự với file `team.yaml`: gõ `nano team.yaml`.
 
 ---
 
 ## Bước 3: Cài đặt thư viện (Chiến thuật siêu tiết kiệm dung lượng)
+
 Đảm bảo bạn vẫn đang ở trong thư mục `/home/seecodenotion/SEE-Notion`. Hãy chạy lần lượt 3 lệnh sau:
 
 1. Tạo môi trường ảo (venv):
@@ -41,11 +57,13 @@ AlwaysData là một dịch vụ tuyệt vời cho bot nhỏ vì nó **miễn ph
    ```bash
    pip install --no-cache-dir -r requirements.txt
    ```
+
 *(Ngồi đợi nó cài xong, hy vọng là không vượt quá 100MB!)*
 
 ---
 
 ## Bước 4: Thiết lập "Services" để bot chạy ngầm vĩnh viễn
+
 Điểm ăn tiền nhất của AlwaysData là tính năng này. Nếu bot sập, máy chủ sẽ tự động gọi nó dậy!
 
 1. Quay lại trang **Dashboard** của AlwaysData (trên trình duyệt web).
@@ -55,8 +73,8 @@ AlwaysData là một dịch vụ tuyệt vời cho bot nhỏ vì nó **miễn ph
    - **Name:** `SEE_Notion_Bot` (Tên gì cũng được)
    - **Working directory:** `/home/seecodenotion/SEE-Notion`
    - **Command:** `/home/seecodenotion/SEE-Notion/venv/bin/python -m app.main`
-   *(Lưu ý: Không dùng lệnh `cd` trong Command vì Alwaysdata chạy qua `exec` trực tiếp, không hỗ trợ shell built-in `cd`)*
+     *(Lưu ý: Không dùng lệnh `cd` trong Command vì Alwaysdata chạy qua `exec` trực tiếp, không hỗ trợ shell built-in `cd`)*
 5. Bấm **Submit** (Lưu lại).
 
-🪄 **BÙM! HOÀN TẤT!** 
+🪄 **BÙM! HOÀN TẤT!**
 AlwaysData sẽ lập tức chạy cái câu lệnh kia ở dưới nền (background). Bạn có thể đóng CMD, tắt máy tính đi ngủ, con bot của bạn bây giờ đã chạy 24/7 mãi mãi!
