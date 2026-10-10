@@ -26,7 +26,7 @@ async def lifespan(app: FastAPI):
     app.state.container = container
     log.info("Container sẵn sàng (LLM=%s, email=%s)", get_settings().llm_provider,
              get_settings().email_backend)
-    await container.sync_notion_users()
+    asyncio.create_task(container.sync_notion_users())
 
     # REST API
     from app.api.routers import api_router
