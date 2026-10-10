@@ -411,8 +411,16 @@ def setup_commands(bot: SEENotionBot) -> None:
                         actor=actor, fields=fields, today=today, session=session
                     )
                     all_payloads.append(prep["payload"])
-                    all_summaries.append(f"**{i + 1}. {task_data['title']}**")
-                    all_summaries.extend([f"   {line}" for line in prep["summary_lines"]])
+                    assignee_str = (
+                        ", ".join(task_data["assignee_names_raw"])
+                        if task_data.get("assignee_names_raw")
+                        else "Chưa gán"
+                    )
+                    due_str = task_data.get("deadline") or "Chưa có"
+                    status_str = f" | {task_data['status']}" if task_data.get("status") else ""
+                    all_summaries.append(
+                        f"• **{i + 1}. {task_data['title']}** (👤 {assignee_str} | 📅 {due_str}{status_str})"
+                    )
                     if prep["warnings"]:
                         all_warnings.extend(
                             [
@@ -429,19 +437,30 @@ def setup_commands(bot: SEENotionBot) -> None:
                 await interaction.followup.send("❌ Không có task hợp lệ nào để tạo.")
                 return
 
-            # Create combined preview
-            body = f"📋 **Xác nhận tạo {len(all_payloads)} task:**\n\n"
-            body += "\n".join(all_summaries[:20])  # Limit preview length
-            if len(all_summaries) > 20:
-                body += f"\n... và {len(all_summaries) - 20} task nữa"
+            # Create combined preview with character limit safety (< 1900 chars)
+            body_lines = [f"📋 **Xác nhận tạo {len(all_payloads)} task:**\n"]
+            included_count = 0
+
+            for line in all_summaries:
+                current_text = "\n".join(body_lines) + "\n" + line
+                if len(current_text) > 1500:
+                    break
+                body_lines.append(line)
+                included_count += 1
+
+            if included_count < len(all_summaries):
+                body_lines.append(f"\n... và {len(all_summaries) - included_count} task nữa.")
 
             if all_warnings:
-                body += "\n\n⚠️ **Cảnh báo:**\n" + "\n".join(all_warnings[:10])
+                body_lines.append("\n⚠️ **Cảnh báo:**\n" + "\n".join(all_warnings[:5]))
 
-            body += "\n\n_Hết hạn sau 10 phút._"
+            body_lines.append("\n_Hết hạn sau 10 phút._")
+            body = "\n".join(body_lines)
+
+            if len(body) > 1900:
+                body = body[:1850] + "\n...\n_Hết hạn sau 10 phút._"
 
             # Store all payloads in confirmation
-
             combined_payload = {
                 "intent": "bulk_create",
                 "tasks": all_payloads,
