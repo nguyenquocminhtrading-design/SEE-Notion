@@ -126,9 +126,10 @@ def parse_smart_deadline_and_status(raw: str, today: Any) -> tuple[str | None, s
         days = int(day_match.group(1))
         return (today + timedelta(days=days)).isoformat(), status
 
-    # Try simple date parsing (DD/MM/YYYY or DD/MM)
-    if date_text:
-        parsed_date = try_parse_date_simple(date_text, today)
+    # Extract DD/MM/YYYY or DD/MM pattern
+    date_match = re.search(r"(\d{1,2}/\d{1,2}(?:/\d{4})?)", raw_clean)
+    if date_match:
+        parsed_date = try_parse_date_simple(date_match.group(1), today)
         if parsed_date:
             return parsed_date, status
 

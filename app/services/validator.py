@@ -40,14 +40,15 @@ def try_parse_date_simple(text: str, today: date) -> str | None:
     m = _RE_DDMM.match(text)
     if m:
         d, mo = int(m.group(1)), int(m.group(2))
-        for y in [today.year, today.year + 1]:
-            try:
-                candidate = date(y, mo, d)
-                if candidate >= today:
-                    return candidate.isoformat()
-            except ValueError:
-                continue
-        return None
+        try:
+            candidate = date(today.year, mo, d)
+            from datetime import timedelta
+            if candidate < today - timedelta(days=60):
+                # If it's more than 2 months in the past, probably meant next year
+                candidate = date(today.year + 1, mo, d)
+            return candidate.isoformat()
+        except ValueError:
+            return None
     return None
 
 
