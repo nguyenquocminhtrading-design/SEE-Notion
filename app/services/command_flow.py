@@ -307,6 +307,17 @@ class CommandFlow:
         if intent == "bulk_create":
             return await self._execute_bulk_create(actor=actor, payload=payload, session=session)
 
+        if intent == "bulk_complete":
+            tasks = payload.get("tasks", [])
+            results = []
+            for t in tasks:
+                try:
+                    await self.tasks.change_status(actor_name=actor.display_name, task=t, target="Done")
+                    results.append(f"✅ Đã hoàn thành: {t['title']} ({t.get('task_id')})")
+                except Exception as e:
+                    results.append(f"❌ Lỗi hoàn thành '{t['title']}': {e}")
+            return "\n".join(results)
+
         if intent == "create_task":
             assignee_emails = payload.get("assignee_emails", [])
             assignees = []

@@ -13,4 +13,5 @@ def setup_logging(level: str = "INFO") -> None:
     # Giảm nhiễu thư viện
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("discord").setLevel(logging.WARNING)
+    logging.getLogger("discord.client").setLevel(logging.ERROR)  # Ẩn cảnh báo PyNaCl không cần thiết
     logging.getLogger("apscheduler").setLevel(logging.WARNING)

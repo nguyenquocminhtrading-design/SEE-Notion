@@ -113,6 +113,74 @@ class ConfirmView(discord.ui.View):
         self.stop()
 
 
+class BulkCompleteView(discord.ui.View):
+    def __init__(self, bot, actor, tasks: list, requester_id: int):
+        super().__init__(timeout=600)
+        self.bot = bot
+        self.actor = actor
+        self.requester_id = requester_id
+        self.tasks_map = {t["page_id"]: t for t in tasks}
+        
+        options = []
+        for t in tasks[:25]:
+            label = t["title"][:100]
+            options.append(
+                discord.SelectOption(
+                    label=label, 
+                    value=t["page_id"], 
+                    description=f"{t.get('task_id')} | {t.get('deadline')}"[:100]
+                )
+            )
+            
+        self.select = discord.ui.Select(
+            placeholder="Tick để chọn nhiều task...", 
+            min_values=1, 
+            max_values=len(options), 
+            options=options
+        )
+        self.add_item(self.select)
+        
+        confirm_btn = discord.ui.Button(label="✅ Xác nhận", style=discord.ButtonStyle.success, row=1)
+        confirm_btn.callback = self.confirm
+        self.add_item(confirm_btn)
+        
+        cancel_btn = discord.ui.Button(label="❌ Hủy", style=discord.ButtonStyle.secondary, row=1)
+        cancel_btn.callback = self.cancel
+        self.add_item(cancel_btn)
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.requester_id:
+            await interaction.response.send_message("Chỉ người gọi lệnh mới dùng được.", ephemeral=True)
+            return False
+        return True
+
+    async def confirm(self, interaction: discord.Interaction):
+        if not self.select.values:
+            await interaction.response.send_message("Bạn chưa chọn task nào!", ephemeral=True)
+            return
+            
+        await interaction.response.defer()
+        session = _new_session()
+        try:
+            selected_tasks = [self.tasks_map[pid] for pid in self.select.values]
+            payload = {
+                "intent": "bulk_complete",
+                "tasks": selected_tasks,
+            }
+            result = await self.bot.flow.execute(actor=self.actor, payload=payload, session=session)
+            await interaction.edit_original_response(content=result, view=None)
+        except Exception as e:
+            log.exception("Bulk complete fail")
+            await interaction.edit_original_response(content=f"❌ Đã có lỗi khi thực thi: {e}", view=None)
+        finally:
+            session.close()
+        self.stop()
+
+    async def cancel(self, interaction: discord.Interaction):
+        await interaction.response.edit_message(content="🚫 Đã hủy — không có gì thay đổi.", view=None)
+        self.stop()
+
+
 def _new_session():
     from app.db.session import get_session
 
@@ -234,34 +302,53 @@ def setup_commands(bot: SEENotionBot) -> None:
         finally:
             session.close()
 
-    @bot.tree.command(name="complete", description="Hoàn thành task (VD: xong TSK-001)")
-    @app_commands.describe(text="Mã task hoặc tên task")
-    async def complete(interaction: discord.Interaction, text: str):
+    @bot.tree.command(name="complete", description="Hoàn thành task (Bỏ trống để chọn nhiều task)")
+    @app_commands.describe(text="Mã task hoặc tên task (Bỏ trống để chọn từ danh sách)")
+    async def complete(interaction: discord.Interaction, text: str | None = None):
         session = _new_session()
         try:
             await interaction.response.defer(thinking=True)
             actor = get_actor_by_discord_id(session, interaction.user.id)
             today = datetime.now(get_settings().business_tz).date()
 
-            prep = await bot.flow.prepare_complete(
-                actor=actor, text=text, today=today, session=session
-            )
+            if text and text.strip():
+                prep = await bot.flow.prepare_complete(
+                    actor=actor, text=text, today=today, session=session
+                )
 
-            nonce = bot.container.confirmations.create(
-                session,
-                discord_user=str(interaction.user.id),
-                channel_id=str(interaction.channel_id),
-                payload=prep["payload"],
-                summary_lines=prep["summary_lines"],
-                warnings=prep["warnings"],
-            )
-            body = "📋 **Xác nhận hoàn thành:**\n" + "\n".join(prep["summary_lines"])
-            if prep["warnings"]:
-                body += "\n⚠️ " + "\n⚠️ ".join(prep["warnings"])
-            body += f"\n\n_Hết hạn sau {prep['expires_in_seconds'] // 60} phút._"
-            await interaction.followup.send(
-                body, view=ConfirmView(bot, nonce, interaction.user.id, prep["expires_in_seconds"])
-            )
+                nonce = bot.container.confirmations.create(
+                    session,
+                    discord_user=str(interaction.user.id),
+                    channel_id=str(interaction.channel_id),
+                    payload=prep["payload"],
+                    summary_lines=prep["summary_lines"],
+                    warnings=prep["warnings"],
+                )
+                body = "📋 **Xác nhận hoàn thành:**\n" + "\n".join(prep["summary_lines"])
+                if prep["warnings"]:
+                    body += "\n⚠️ " + "\n⚠️ ".join(prep["warnings"])
+                body += f"\n\n_Hết hạn sau {prep['expires_in_seconds'] // 60} phút._"
+                await interaction.followup.send(
+                    body, view=ConfirmView(bot, nonce, interaction.user.id, prep["expires_in_seconds"])
+                )
+            else:
+                if not actor.user.notion_user_id:
+                    await interaction.followup.send("❌ Tài khoản của bạn chưa link Notion user ID.")
+                    return
+                
+                pages = await bot.flow.tasks.gateway.query_open_tasks()
+                mine = [
+                    bot.flow.tasks.gateway.parse_task(p)
+                    for p in pages
+                    if actor.user.notion_user_id in (bot.flow.tasks.gateway.parse_task(p).get("assignee_ids") or [])
+                ]
+                
+                if not mine:
+                    await interaction.followup.send("🎉 Bạn không có task nào đang mở để hoàn thành!")
+                    return
+                    
+                view = BulkCompleteView(bot, actor, mine, interaction.user.id)
+                await interaction.followup.send("📋 **Bạn muốn hoàn thành (các) task nào?** (có thể tick chọn nhiều task)", view=view)
         except (ParseError, ActionError) as e:
             msg = f"❓ {e.message}" if isinstance(e, ActionError) else f"❓ {e}"
             options = getattr(e, "options", [])
