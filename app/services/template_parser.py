@@ -159,10 +159,12 @@ def parse_tsv_action_items(text: str) -> list[dict[str, Any]]:
         # Split by tab if present, else by 2 or more spaces
         if "\t" in line_str:
             parts = [p.strip() for p in line_str.split("\t")]
+            if not any(parts):
+                continue
         else:
             parts = [p.strip() for p in re.split(r"\s{2,}", line_str) if p.strip()]
 
-        if len(parts) < 2:
+        if len(parts) < 3:
             continue
 
         # Skip header line
@@ -176,20 +178,34 @@ def parse_tsv_action_items(text: str) -> list[dict[str, Any]]:
         ):
             continue
 
-        # Remove leading row number if present (e.g. "1", "11", "12")
-        if re.match(r"^\d+$", parts[0]):
+        # Remove leading row number or empty first column if present (e.g. "1", "1.", "1)")
+        if re.match(r"^\d+[\.\)]?$", parts[0]) or parts[0] == "":
             parts = parts[1:]
 
         if not parts:
             continue
 
         title = parts[0]
-        description = parts[1] if len(parts) > 1 else ""
-        pic_raw = parts[2] if len(parts) > 2 else ""
-        deadline_raw = parts[3] if len(parts) > 3 else (parts[2] if len(parts) == 3 and not pic_raw else "")
+        
+        if len(parts) >= 4:
+            description = parts[1]
+            pic_raw = parts[2]
+            deadline_raw = parts[3]
+        elif len(parts) == 3:
+            description = ""
+            pic_raw = parts[1]
+            deadline_raw = parts[2]
+        elif len(parts) == 2:
+            description = ""
+            pic_raw = parts[1]
+            deadline_raw = ""
+        else:
+            description = ""
+            pic_raw = ""
+            deadline_raw = ""
 
-        # If 3 parts and part 2 looks like a status/deadline rather than PIC
-        if len(parts) == 3 and ("xong" in pic_raw.lower() or "done" in pic_raw.lower() or "/" in pic_raw):
+        # If 2 parts and part 2 looks like a status/deadline rather than PIC
+        if len(parts) == 2 and ("xong" in pic_raw.lower() or "done" in pic_raw.lower() or "/" in pic_raw):
             deadline_raw = pic_raw
             pic_raw = ""
 
