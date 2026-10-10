@@ -28,13 +28,17 @@ class SEENotionBot(discord.Client):
 
     async def setup_hook(self) -> None:
         guild_id = get_settings().discord_guild_id
-        guild = discord.Object(id=int(guild_id)) if guild_id else None
-        if guild:
-            self.tree.copy_global_to(guild=guild)
-            await self.tree.sync(guild=guild)
-        else:
-            await self.tree.sync()
-        log.info("Đã sync slash commands")
+        if guild_id:
+            try:
+                guild = discord.Object(id=int(guild_id))
+                self.tree.copy_global_to(guild=guild)
+                await self.tree.sync(guild=guild)
+                log.info("Đã sync slash commands cho Guild ID %s", guild_id)
+            except Exception as e:
+                log.warning("Không sync được Guild slash commands: %s", e)
+        # Đồng bộ cả Global để phòng trường hợp gọi ngoài Guild hoặc dùng DM
+        await self.tree.sync()
+        log.info("Đã sync slash commands Global")
 
     async def on_ready(self) -> None:
         log.info("Bot online: %s", self.user)
@@ -274,7 +278,8 @@ def setup_commands(bot: SEENotionBot) -> None:
         name="bulk-create", description="Tạo nhiều task từ template (meeting minutes/CSV)"
     )
     @app_commands.describe(
-        text="Nội dung template (Action Items Tracker hoặc CSV)",
+        text="Nội dung template (dán trực tiếp text văn bản)",
+        file="File đính kèm (.txt, .csv, .md chứa nội dung họp/task)",
         format="Định dạng: 'meeting' cho meeting minutes, 'csv' cho CSV",
     )
     @app_commands.choices(
@@ -285,12 +290,48 @@ def setup_commands(bot: SEENotionBot) -> None:
     )
     async def bulk_create(
         interaction: discord.Interaction,
-        text: str,
+        text: str | None = None,
+        file: discord.Attachment | None = None,
         format: Literal["meeting", "csv"] | None = None,
     ):
         session = _new_session()
         try:
             await interaction.response.defer(thinking=True)
+            if file:
+                raw_bytes = await file.read()
+                text = raw_bytes.decode("utf-8", errors="replace")
+
+            if not text or not text.strip():
+                await interaction.followup.send("❌ Vui lòng nhập `text` (nội dung hoặc URL) hoặc đính kèm `file` template.")
+                return
+
+            text_clean = text.strip()
+            import os
+            from pathlib import Path
+
+            if text_clean.startswith(("http://", "https://")):
+                import httpx
+
+                try:
+                    async with httpx.AsyncClient(follow_redirects=True, timeout=15.0) as client:
+                        resp = await client.get(text_clean)
+                        if resp.status_code == 200:
+                            text = resp.text
+                        else:
+                            await interaction.followup.send(
+                                f"❌ Không thể tải nội dung từ URL (mã lỗi HTTP {resp.status_code})."
+                            )
+                            return
+                except Exception as ex:
+                    await interaction.followup.send(f"❌ Lỗi khi tải nội dung từ URL: {ex}")
+                    return
+            elif os.path.exists(text_clean) and os.path.isfile(text_clean):
+                try:
+                    text = Path(text_clean).read_text(encoding="utf-8", errors="replace")
+                except Exception as ex:
+                    await interaction.followup.send(f"❌ Lỗi khi đọc file local: {ex}")
+                    return
+
             actor = get_actor_by_discord_id(session, interaction.user.id)
             today = datetime.now(get_settings().business_tz).date()
 
