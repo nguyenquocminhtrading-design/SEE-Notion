@@ -181,6 +181,78 @@ class BulkCompleteView(discord.ui.View):
         self.stop()
 
 
+class MemberSelectView(discord.ui.View):
+    def __init__(self, bot, actor, all_tasks: list, users: list, requester_id: int):
+        super().__init__(timeout=600)
+        self.bot = bot
+        self.actor = actor
+        self.all_tasks = all_tasks
+        self.requester_id = requester_id
+        
+        options = []
+        # Max 25 options for discord select
+        for u in users[:25]:
+            options.append(
+                discord.SelectOption(
+                    label=u.display_name, 
+                    value=str(u.id), 
+                    description=u.full_name or ""
+                )
+            )
+            
+        self.select = discord.ui.Select(
+            placeholder="Chọn thành viên...", 
+            min_values=1, 
+            max_values=1, 
+            options=options
+        )
+        self.select.callback = self.on_select
+        self.add_item(self.select)
+        
+        cancel_btn = discord.ui.Button(label="❌ Hủy", style=discord.ButtonStyle.secondary, row=1)
+        cancel_btn.callback = self.cancel
+        self.add_item(cancel_btn)
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.requester_id:
+            await interaction.response.send_message("Chỉ người gọi lệnh mới dùng được.", ephemeral=True)
+            return False
+        return True
+
+    async def on_select(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        selected_user_id = int(self.select.values[0])
+        
+        session = _new_session()
+        try:
+            from app.db.models import User
+            target_user = session.get(User, selected_user_id)
+            if not target_user or not target_user.notion_user_id:
+                await interaction.edit_original_response(content="❌ Thành viên này chưa link Notion.", view=None)
+                return
+                
+            member_tasks = [
+                t for t in self.all_tasks
+                if target_user.notion_user_id in (t.get("assignee_ids") or [])
+            ]
+            
+            if not member_tasks:
+                await interaction.edit_original_response(content=f"🎉 {target_user.display_name} không có task nào đang mở!", view=None)
+                return
+                
+            view = BulkCompleteView(self.bot, self.actor, member_tasks, self.requester_id)
+            await interaction.edit_original_response(
+                content=f"📋 **Task đang mở của {target_user.display_name}:** (tick chọn các task muốn hoàn thành)", 
+                view=view
+            )
+        finally:
+            session.close()
+
+    async def cancel(self, interaction: discord.Interaction):
+        await interaction.response.edit_message(content="🚫 Đã hủy.", view=None)
+        self.stop()
+
+
 def _new_session():
     from app.db.session import get_session
 
@@ -305,9 +377,9 @@ def setup_commands(bot: SEENotionBot) -> None:
     @bot.tree.command(name="complete", description="Hoàn thành task (Bỏ trống để chọn nhiều task)")
     @app_commands.describe(text="Mã task hoặc tên task (Bỏ trống để chọn từ danh sách)")
     async def complete(interaction: discord.Interaction, text: str | None = None):
+        await interaction.response.defer(thinking=True)
         session = _new_session()
         try:
-            await interaction.response.defer(thinking=True)
             actor = get_actor_by_discord_id(session, interaction.user.id)
             today = datetime.now(get_settings().business_tz).date()
 
@@ -332,23 +404,15 @@ def setup_commands(bot: SEENotionBot) -> None:
                     body, view=ConfirmView(bot, nonce, interaction.user.id, prep["expires_in_seconds"])
                 )
             else:
-                if not actor.user.notion_user_id:
-                    await interaction.followup.send("❌ Tài khoản của bạn chưa link Notion user ID.")
-                    return
-                
                 pages = await bot.flow.tasks.gateway.query_open_tasks()
-                mine = [
-                    bot.flow.tasks.gateway.parse_task(p)
-                    for p in pages
-                    if actor.user.notion_user_id in (bot.flow.tasks.gateway.parse_task(p).get("assignee_ids") or [])
-                ]
+                all_tasks = [bot.flow.tasks.gateway.parse_task(p) for p in pages]
                 
-                if not mine:
-                    await interaction.followup.send("🎉 Bạn không có task nào đang mở để hoàn thành!")
-                    return
-                    
-                view = BulkCompleteView(bot, actor, mine, interaction.user.id)
-                await interaction.followup.send("📋 **Bạn muốn hoàn thành (các) task nào?** (có thể tick chọn nhiều task)", view=view)
+                from app.db.models import User
+                from sqlalchemy import select
+                users = session.scalars(select(User)).all()
+                
+                view = MemberSelectView(bot, actor, all_tasks, list(users), interaction.user.id)
+                await interaction.followup.send("👤 **Bạn muốn hoàn thành task cho ai?** (Chọn thành viên bên dưới)", view=view)
         except (ParseError, ActionError) as e:
             msg = f"❓ {e.message}" if isinstance(e, ActionError) else f"❓ {e}"
             options = getattr(e, "options", [])
