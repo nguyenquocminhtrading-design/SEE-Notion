@@ -29,7 +29,7 @@ async def lifespan(app: FastAPI):
     await container.sync_notion_users()
 
     # REST API
-    from app.api.routers import api_router, health_router
+    from app.api.routers import api_router
     app.include_router(api_router(container))
 
     # Scheduler reminder
@@ -56,7 +56,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="SEE Notion", version="0.1.0", lifespan=lifespan)
 
-from app.api.routers import health_router  # noqa: E402
+from app.api.routers import health_router
+
 app.include_router(health_router())
 
 

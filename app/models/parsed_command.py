@@ -1,5 +1,5 @@
 """JSON schema đầu ra của LLM (kế hoạch §9.1) — Pydantic ép chặt."""
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -33,25 +33,25 @@ JSON_SCHEMA_HINT = """{
 
 
 class TaskRef(BaseModel):
-    task_id: Optional[str] = None
-    title_hint: Optional[str] = None
+    task_id: str | None = None
+    title_hint: str | None = None
 
 
 class ParsedCommand(BaseModel):
     intent: Intent = "unknown"
     confidence: float = 0.0
     task_ref: TaskRef = Field(default_factory=TaskRef)
-    title: Optional[str] = None
-    description: Optional[str] = None
-    assignee_name_raw: Optional[str] = None          # tương thích đơn giản
+    title: str | None = None
+    description: str | None = None
+    assignee_name_raw: str | None = None          # tương thích đơn giản
     assignee_names_raw: list[str] = Field(default_factory=list)  # nhiều người
-    start_date: Optional[str] = None
-    deadline: Optional[str] = None
-    deadline_time: Optional[str] = None
-    priority: Optional[str] = None
-    task_type: Optional[str] = None
-    effort: Optional[str] = None
-    status: Optional[Status] = None
+    start_date: str | None = None
+    deadline: str | None = None
+    deadline_time: str | None = None
+    priority: str | None = None
+    task_type: str | None = None
+    effort: str | None = None
+    status: Status | None = None
     missing_fields: list[str] = Field(default_factory=list)
     ambiguous_fields: list[str] = Field(default_factory=list)
     user_language: str = "vi"

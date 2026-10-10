@@ -4,8 +4,6 @@ Mô hình: cron tick mỗi 5' -> query task mở -> với mỗi task × rule, n�
 hôm nay thì INSERT notification_log (UNIQUE task_id+rule_key+due_date+channel).
 Insert thành công = "chưa gửi lần nào" -> gửi. Trùng = constraint chặn -> skip.
 """
-import asyncio
-import json
 import logging
 from datetime import date, timedelta
 

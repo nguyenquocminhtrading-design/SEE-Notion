@@ -82,7 +82,7 @@ def seed_users_from_yaml(session: Session) -> int:
 
 
 def get_actor_by_discord_id(session: Session, discord_id: str) -> Actor:
-    user = session.scalar(select(User).where(User.discord_id == str(discord_id), User.active == True))  # noqa: E712
+    user = session.scalar(select(User).where(User.discord_id == str(discord_id), User.active == True))
     if user is None:
         raise NotAuthorized(
             "Bạn chưa có trong danh bạ team. Liên hệ admin (xem team.yaml) để được thêm."

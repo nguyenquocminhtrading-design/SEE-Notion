@@ -1,9 +1,8 @@
 """Pending actions: preview chờ xác nhận. Nonce 1-lần, TTL, chỉ chủ nonce redeem được."""
 import json
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import load_yaml_config
@@ -21,7 +20,7 @@ class ConfirmationService:
     def create(self, session: Session, *, discord_user: str, channel_id: str,
                payload: dict, summary_lines: list[str], warnings: list[str]) -> str:
         nonce = uuid.uuid4().hex
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         summary = "\n".join(summary_lines)
         if warnings:
             summary += "\n⚠️ " + "\n⚠️ ".join(warnings)
@@ -46,8 +45,8 @@ class ConfirmationService:
             raise NonceError("Hành động này đã được xác nhận rồi.")
         if pa.discord_user != str(discord_user):
             raise NonceError("Chỉ người tạo lệnh mới được xác nhận.")
-        if datetime.now(timezone.utc).isoformat() > pa.expires_at:
+        if datetime.now(UTC).isoformat() > pa.expires_at:
             raise NonceError("Đã hết hạn (10 phút). Gửi lại lệnh nhé.")
-        pa.consumed_at = datetime.now(timezone.utc).isoformat()
+        pa.consumed_at = datetime.now(UTC).isoformat()
         session.commit()
         return json.loads(pa.payload_json)

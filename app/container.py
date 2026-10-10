@@ -1,7 +1,6 @@
 """Container: dựng toàn bộ dependency 1 lần, chia sẻ cho bot/API/scheduler."""
 import logging
 from dataclasses import dataclass, field
-from typing import Optional
 
 from sqlalchemy import select
 
@@ -32,12 +31,12 @@ class Container:
     reminder: ReminderEngine
     llm: LLMClient
     email: EmailSender
-    _discord_send: Optional[object] = field(default=None, repr=False)
+    _discord_send: object | None = field(default=None, repr=False)
 
     def users_provider(self):
         session = get_session()
         try:
-            return list(session.scalars(select(User).where(User.active == True)))  # noqa: E712
+            return list(session.scalars(select(User).where(User.active == True)))
         finally:
             session.close()
 
@@ -67,7 +66,7 @@ class Container:
         matched = 0
         session = get_session()
         try:
-            for u in session.scalars(select(User).where(User.active == True)):  # noqa: E712
+            for u in session.scalars(select(User).where(User.active == True)):
                 if u.notion_user_id:
                     continue
                 for nu in notion_users:

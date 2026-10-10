@@ -2,7 +2,7 @@
 import logging
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
@@ -37,8 +37,8 @@ def health_router() -> APIRouter:
 
     @router.get("/readyz")
     async def readyz():
-        from app.db.session import get_session
         from app.adapters.notion_gateway import NotionError
+        from app.db.session import get_session
         checks = {"db": "ok", "notion": "ok"}
         try:
             session = get_session()
@@ -84,9 +84,10 @@ def api_router(container) -> APIRouter:
 
     @router.get("/audit")
     async def audit(task_ref: str | None = None, limit: int = 50):
+        from sqlalchemy import select
+
         from app.db.models import AuditLog
         from app.db.session import get_session
-        from sqlalchemy import select
         session = get_session()
         try:
             q = select(AuditLog).order_by(AuditLog.id.desc()).limit(limit)

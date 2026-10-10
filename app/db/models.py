@@ -1,12 +1,12 @@
 """Models SQLite — trạng thái vận hành của hệ thống (Notion = nguồn sự thật nghiệp vụ)."""
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import Boolean, Integer, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
 def utcnow_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 class Base(DeclarativeBase):

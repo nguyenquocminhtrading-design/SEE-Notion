@@ -2,23 +2,24 @@
 
 100% deterministic (không LLM): validate ngày, resolve assignee, kiểm tra lifecycle/quyền.
 """
+
 import logging
 import re
 import unicodedata
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 
+from app.models.parsed_command import ParsedCommand
 from app.models.preview import ActionError, ClarifyError
 from app.models.task import validate_priority
-from app.models.parsed_command import ParsedCommand
 
 log = logging.getLogger(__name__)
 
 FUZZY_THRESHOLD = 85  # 0-100 (rapidfuzz-style scoring qua difflib)
 
 # Regex nhận diện ngày chuẩn — không cần gọi LLM
-_RE_DDMMYYYY = re.compile(r'^(\d{1,2})/(\d{1,2})/(\d{4})$')
-_RE_DDMM     = re.compile(r'^(\d{1,2})/(\d{1,2})$')
-_RE_ISO      = re.compile(r'^\d{4}-\d{2}-\d{2}$')
+_RE_DDMMYYYY = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{4})$")
+_RE_DDMM = re.compile(r"^(\d{1,2})/(\d{1,2})$")
+_RE_ISO = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 def try_parse_date_simple(text: str, today: date) -> str | None:
@@ -53,7 +54,8 @@ def try_parse_date_simple(text: str, today: date) -> str | None:
 def _norm(s: str) -> str:
     """Bỏ dấu tiếng Việt + lowercase để so khớp tên."""
     return "".join(
-        c for c in unicodedata.normalize("NFD", s.strip().lower())
+        c
+        for c in unicodedata.normalize("NFD", s.strip().lower())
         if unicodedata.category(c) != "Mn"
     )
 
@@ -64,7 +66,9 @@ def validate_date(s: str | None, field: str) -> str | None:
     try:
         datetime.strptime(s, "%Y-%m-%d")
     except ValueError as e:
-        raise ActionError("VALIDATION_FAILED", f"{field} không hợp lệ: {s!r}. Định dạng YYYY-MM-DD.") from e
+        raise ActionError(
+            "VALIDATION_FAILED", f"{field} không hợp lệ: {s!r}. Định dạng YYYY-MM-DD."
+        ) from e
     return s
 
 
@@ -90,6 +94,7 @@ def resolve_assignee(name_raw: str, users: list) -> object:
             SequenceMatcher(None, norm, _norm(u.display_name)).ratio() * 100,
             SequenceMatcher(None, norm, _norm(u.full_name or "")).ratio() * 100,
         )
+
     ranked = sorted(users, key=score, reverse=True)
     best, best_score = ranked[0], score(ranked[0])
     if best_score >= FUZZY_THRESHOLD:
@@ -99,6 +104,53 @@ def resolve_assignee(name_raw: str, users: list) -> object:
         f"Không tìm thấy ai tên {name_raw!r} trong team.",
         options=[u.display_name for u in ranked[:3]],
     )
+
+
+def resolve_assignees(names_raw: list[str], users: list) -> list:
+    """Resolve multiple assignee names to User objects.
+
+    Args:
+        names_raw: List of raw assignee names from command (e.g., ["Minh", "Cường"])
+        users: List of User objects from team.yaml
+
+    Returns:
+        List of resolved User objects
+
+    Raises:
+        ClarifyError: If any name is ambiguous or unknown
+    """
+    if not names_raw:
+        return []
+
+    resolved = []
+    errors = []
+
+    for name in names_raw:
+        name = name.strip()
+        if not name:
+            continue
+        try:
+            user = resolve_assignee(name, users)
+            resolved.append(user)
+        except ClarifyError as e:
+            errors.append(f"{name}: {e.message}")
+
+    if errors:
+        raise ClarifyError(
+            "MULTIPLE_ASSIGNEE_ERRORS",
+            "Có lỗi khi phân giải assignee:\n" + "\n".join(errors),
+            options=[u.display_name for u in users],
+        )
+
+    # Check for duplicates
+    seen_ids = set()
+    unique_resolved = []
+    for u in resolved:
+        if u.id not in seen_ids:
+            seen_ids.add(u.id)
+            unique_resolved.append(u)
+
+    return unique_resolved
 
 
 def build_preview_fields(parsed: ParsedCommand, today: date) -> tuple[dict, list[str]]:
@@ -114,7 +166,9 @@ def build_preview_fields(parsed: ParsedCommand, today: date) -> tuple[dict, list
     if parsed.deadline_time is None:
         warnings.append("Không rõ giờ cụ thể — mặc định hết hạn 23:59 (ICT)")
     if deadline and deadline < today.isoformat() and parsed.intent == "create_task":
-        warnings.append(f"Deadline {deadline} là ngày trong quá khứ so với hôm nay {today.isoformat()} — bạn chắc chứ?")
+        warnings.append(
+            f"Deadline {deadline} là ngày trong quá khứ so với hôm nay {today.isoformat()} — bạn chắc chứ?"
+        )
     fields = {
         "title": parsed.title,
         "description": parsed.description,

@@ -1,5 +1,5 @@
 """Preview object trả về cho Discord/web (kế hoạch §8)."""
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel
 

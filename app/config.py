@@ -3,7 +3,6 @@ from functools import lru_cache
 from pathlib import Path
 
 import yaml
-from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parent.parent
