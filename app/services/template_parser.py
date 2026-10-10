@@ -1,9 +1,9 @@
-"""Template parser for meeting minutes and bulk task creation."""
+"""Template parser for meeting minutes, TSV action item tables, and bulk task creation."""
 
 import csv
 import io
 import re
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from app.services.validator import try_parse_date_simple
@@ -16,29 +16,171 @@ class TemplateParseError(Exception):
         self.line_num = line_num
 
 
-def parse_meeting_minutes(text: str) -> list[dict[str, Any]]:
-    """Parse Action Items Tracker from meeting minutes format.
+def parse_pic_names(raw: str) -> list[str]:
+    """Parse PIC (Owner) string into clean assignee names list.
 
-    Expected format:
-    Action Items Tracker:
-    - Task: [task name] | Assignee: [name(s)] | Deadline: [date] | Priority: [High/Medium/Low] | Status: [status]
-    - Task: ...
-
-    Or table format:
-    | Task | Assignee | Deadline | Priority | Status |
-    |---|---|---|---|---|
-    | Task name | Minh, Cường | 30/09/2026 | High | Not started |
+    Examples:
+    - "Minh / [PIC bổ sung]" -> ["Minh"]
+    - "Ánh → Cường" -> ["Ánh", "Cường"]
+    - "Hân (Minh)" -> ["Hân", "Minh"]
+    - "[PIC]" -> []
     """
-    tasks = []
+    if not raw or not raw.strip():
+        return []
 
-    # Find Action Items section
+    # Remove placeholders like [PIC bổ sung], [PIC], [DD/MM]
+    clean = re.sub(r"\[.*?\]", "", raw)
+    # Convert delimiters →, /, (, ) to comma
+    clean = clean.replace("→", ",").replace("/", ",").replace("(", ",").replace(")", ",")
+    clean = clean.replace(" và ", ",")
+
+    names = [n.strip() for n in clean.split(",") if n.strip()]
+    return names
+
+
+def parse_smart_deadline_and_status(raw: str, today: Any) -> tuple[str | None, str]:
+    """Parse deadline string and status intelligently.
+
+    Examples:
+    - "Xong 6/10" -> ("2026-10-06", "Done")
+    - "Done" / "done" -> (today.isoformat(), "Done")
+    - "2 tuần" -> (today + 14 days, "Not started")
+    - "[DD/MM]" -> (None, "Not started")
+    """
+    if not raw:
+        return None, "Not started"
+
+    raw_clean = raw.strip()
+    status = "Not started"
+
+    # Check for Done / Xong
+    is_done = False
+    if re.search(r"\b(done|xong)\b", raw_clean, re.IGNORECASE):
+        is_done = True
+        status = "Done"
+
+    # Clean words "Xong", "Done" to extract date
+    date_text = re.sub(r"\b(done|xong)\b", "", raw_clean, flags=re.IGNORECASE).strip()
+
+    # Check "N tuần"
+    week_match = re.search(r"(\d+)\s*tuần", raw_clean, re.IGNORECASE)
+    if week_match:
+        weeks = int(week_match.group(1))
+        return (today + timedelta(days=weeks * 7)).isoformat(), status
+
+    # Check "N ngày"
+    day_match = re.search(r"(\d+)\s*ngày", raw_clean, re.IGNORECASE)
+    if day_match:
+        days = int(day_match.group(1))
+        return (today + timedelta(days=days)).isoformat(), status
+
+    # Try simple date parsing (DD/MM/YYYY or DD/MM)
+    if date_text:
+        parsed_date = try_parse_date_simple(date_text, today)
+        if parsed_date:
+            return parsed_date, status
+
+    if is_done:
+        return today.isoformat(), "Done"
+
+    return None, status
+
+
+def parse_tsv_action_items(text: str) -> list[dict[str, Any]]:
+    """Parse TSV / Tab-separated or space-separated Action Items table layout.
+
+    Example columns:
+    No. | Action Item / Specific Task | Expected Deliverable | PIC (Owner) | Deadline
+    """
+    lines = text.strip().split("\n")
+    if not lines:
+        return []
+
+    tasks = []
+    today = datetime.now(UTC).date()
+
+    for i, line in enumerate(lines, start=1):
+        line_str = line.strip()
+        if not line_str:
+            continue
+
+        # Split by tab if present, else by 2 or more spaces
+        if "\t" in line_str:
+            parts = [p.strip() for p in line_str.split("\t")]
+        else:
+            parts = [p.strip() for p in re.split(r"\s{2,}", line_str) if p.strip()]
+
+        if len(parts) < 2:
+            continue
+
+        # Skip header line
+        header_check = " ".join(parts).lower()
+        if (
+            "action item" in header_check
+            or "specific task" in header_check
+            or "pic (owner)" in header_check
+            or "expected deliverable" in header_check
+            or "no." in header_check
+        ):
+            continue
+
+        # Remove leading row number if present (e.g. "1", "11", "12")
+        if re.match(r"^\d+$", parts[0]):
+            parts = parts[1:]
+
+        if not parts:
+            continue
+
+        title = parts[0]
+        description = parts[1] if len(parts) > 1 else ""
+        pic_raw = parts[2] if len(parts) > 2 else ""
+        deadline_raw = parts[3] if len(parts) > 3 else (parts[2] if len(parts) == 3 and not pic_raw else "")
+
+        # If 3 parts and part 2 looks like a status/deadline rather than PIC
+        if len(parts) == 3 and ("xong" in pic_raw.lower() or "done" in pic_raw.lower() or "/" in pic_raw):
+            deadline_raw = pic_raw
+            pic_raw = ""
+
+        # Parse PIC (Owner)
+        assignees = parse_pic_names(pic_raw)
+
+        # Parse Deadline and Status
+        deadline, status = parse_smart_deadline_and_status(deadline_raw, today)
+
+        # Default deadline if missing
+        if not deadline:
+            if status == "Done":
+                deadline = today.isoformat()
+            else:
+                deadline = (today + timedelta(days=7)).isoformat()
+
+        tasks.append(
+            {
+                "title": title,
+                "description": description,
+                "assignee_names_raw": assignees,
+                "deadline": deadline,
+                "priority": "Medium",
+                "status": status,
+                "task_type": "",
+                "effort": "",
+                "start_date": "",
+                "line_num": i,
+            }
+        )
+
+    return tasks
+
+
+def parse_meeting_minutes(text: str) -> list[dict[str, Any]]:
+    """Parse Action Items Tracker from meeting minutes format."""
+    tasks = []
     lines = text.split("\n")
     in_action_items = False
 
     for i, line in enumerate(lines):
         line_stripped = line.strip()
 
-        # Detect start of action items
         if re.search(r"action items?\s*tracker", line_stripped, re.IGNORECASE):
             in_action_items = True
             continue
@@ -46,7 +188,6 @@ def parse_meeting_minutes(text: str) -> list[dict[str, Any]]:
         if not in_action_items:
             continue
 
-        # Stop at next major section
         if re.search(
             r"^(?:next steps?|meeting overview|key discussions?|interview|weekly)",
             line_stripped,
@@ -54,7 +195,6 @@ def parse_meeting_minutes(text: str) -> list[dict[str, Any]]:
         ):
             break
 
-        # Parse bullet format: - Task: X | Assignee: Y | Deadline: Z | Priority: P | Status: S
         bullet_match = re.match(r"^[-*]\s*(.+)$", line_stripped)
         if bullet_match:
             content = bullet_match.group(1)
@@ -63,7 +203,6 @@ def parse_meeting_minutes(text: str) -> list[dict[str, Any]]:
                 tasks.append(task)
             continue
 
-        # Parse table format
         if "|" in line_stripped and not line_stripped.startswith("|---"):
             task = parse_table_row(line_stripped, i + 1)
             if task:
@@ -74,7 +213,6 @@ def parse_meeting_minutes(text: str) -> list[dict[str, Any]]:
 
 def parse_bullet_task(content: str, line_num: int) -> dict[str, Any] | None:
     """Parse a single bullet task line."""
-    # Expected: Task: [name] | Assignee: [names] | Deadline: [date] | Priority: [p] | Status: [s]
     fields = {}
     parts = content.split("|")
 
@@ -92,15 +230,12 @@ def parse_bullet_task(content: str, line_num: int) -> dict[str, Any] | None:
 
 def parse_table_row(line: str, line_num: int) -> dict[str, Any] | None:
     """Parse a table row."""
-    # Split by | and clean
     cells = [c.strip() for c in line.split("|")]
-    cells = [c for c in cells if c]  # Remove empty
+    cells = [c for c in cells if c]
 
     if len(cells) < 2:
         return None
 
-    # Assume header order: Task | Assignee | Deadline | Priority | Status
-    # Or detect from header row
     fields = {
         "task": cells[0] if len(cells) > 0 else "",
         "assignee": cells[1] if len(cells) > 1 else "",
@@ -110,17 +245,15 @@ def parse_table_row(line: str, line_num: int) -> dict[str, Any] | None:
     }
 
     if not fields["task"] or fields["task"].lower() == "task":
-        return None  # Skip header row
+        return None
 
     return build_task_dict(fields, line_num)
 
 
 def build_task_dict(fields: dict[str, str], line_num: int) -> dict[str, Any]:
     """Build standardized task dict from parsed fields."""
-
     today = datetime.now(UTC).date()
 
-    # Parse deadline
     deadline = None
     if fields.get("deadline"):
         deadline = try_parse_date_simple(fields["deadline"], today)
@@ -129,13 +262,11 @@ def build_task_dict(fields: dict[str, str], line_num: int) -> dict[str, Any]:
                 f"Không nhận diện được deadline: {fields['deadline']}", line_num
             )
 
-    # Parse assignees (comma or "và" separated)
     assignees = []
     if fields.get("assignee"):
         assignee_str = fields["assignee"]
-        assignees = [a.strip() for a in assignee_str.replace(" và ", ",").split(",") if a.strip()]
+        assignees = parse_pic_names(assignee_str)
 
-    # Validate priority
     priority = fields.get("priority", "Medium")
     if priority not in ("High", "Medium", "Low"):
         priority = "Medium"
@@ -155,15 +286,11 @@ def build_task_dict(fields: dict[str, str], line_num: int) -> dict[str, Any]:
 
 
 def parse_csv(text: str) -> list[dict[str, Any]]:
-    """Parse CSV format task list.
-
-    Expected columns: Task, Assignee, Deadline, Priority, Status, Description, Type, Effort, Start Date
-    """
+    """Parse CSV format task list."""
     tasks = []
     reader = csv.DictReader(io.StringIO(text))
 
     for i, row in enumerate(reader, start=1):
-        # Normalize keys
         row = {k.strip().lower(): v.strip() for k, v in row.items() if v}
 
         if not row.get("task"):
@@ -181,14 +308,15 @@ def parse_csv(text: str) -> list[dict[str, Any]]:
 
 
 def parse_template_input(text: str, format_hint: str | None = None) -> list[dict[str, Any]]:
-    """Auto-detect format and parse.
-
-    Args:
-        text: Input text
-        format_hint: 'meeting', 'csv', or None for auto-detect
-    """
+    """Auto-detect format and parse."""
     if format_hint == "csv" or (
-        format_hint is None and text.strip().startswith("Task,") or "Assignee," in text
+        format_hint is None and ("Task," in text or "Assignee," in text)
     ):
         return parse_csv(text)
+
+    # Try TSV / Action Item table format
+    tsv_tasks = parse_tsv_action_items(text)
+    if tsv_tasks:
+        return tsv_tasks
+
     return parse_meeting_minutes(text)

@@ -78,3 +78,22 @@ def test_preview_bad_priority_falls_back():
     fields, warnings = build_preview_fields(_parsed(priority="Khẩn"), date(2026, 9, 24))
     assert fields["priority"] == "Medium"
     assert warnings
+
+
+def test_parse_tsv_action_items():
+    from app.services.template_parser import parse_template_input
+
+    sample = """No.\tAction Item / Specific Task\tExpected Deliverable\tPIC (Owner)\tDeadline
+1\tXây dựng cơ chế xét Certificate\tCertificate Criteria + Evaluation Mechanism\tMinh / [PIC bổ sung]\tXong 6/10
+4\tHoàn thiện poster từ thiết kế/hình ảnh của Ánh\tFinal Poster\tÁnh → Cường\tDone
+5\tSoạn & Gửi email đến member cũ của các CLB\tMember Outreach Email\tHân (Minh)\tDone
+11\tLên plan tổng quan idea dự án\tIdea Plan/System Plan / Prototype\tHân\t2 tuần
+"""
+    res = parse_template_input(sample)
+    assert len(res) == 4
+    assert res[0]["title"] == "Xây dựng cơ chế xét Certificate"
+    assert res[0]["assignee_names_raw"] == ["Minh"]
+    assert res[0]["status"] == "Done"
+    assert res[1]["assignee_names_raw"] == ["Ánh", "Cường"]
+    assert res[2]["assignee_names_raw"] == ["Hân", "Minh"]
+
