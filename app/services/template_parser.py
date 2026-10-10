@@ -7,6 +7,58 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from app.services.validator import try_parse_date_simple
+import zipfile
+import xml.etree.ElementTree as ET
+
+
+def extract_text_from_docx(file_bytes: bytes) -> str:
+    """Extract text from docx, formatting tables as TSV for parser."""
+    try:
+        with zipfile.ZipFile(io.BytesIO(file_bytes)) as docx:
+            if "word/document.xml" not in docx.namelist():
+                return ""
+            xml_content = docx.read("word/document.xml")
+            
+        tree = ET.ElementTree(ET.fromstring(xml_content))
+        root = tree.getroot()
+        
+        # Word XML namespace
+        ns = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
+        
+        lines = []
+        
+        # Iterate over body elements (paragraphs w:p and tables w:tbl)
+        body = root.find('w:body', ns)
+        if body is None:
+            return ""
+            
+        for elem in body:
+            if elem.tag == f"{{{ns['w']}}}p":
+                # Paragraph
+                texts = elem.findall('.//w:t', ns)
+                para_text = "".join(t.text for t in texts if t.text)
+                if para_text.strip():
+                    lines.append(para_text)
+            elif elem.tag == f"{{{ns['w']}}}tbl":
+                # Table
+                for row in elem.findall('.//w:tr', ns):
+                    row_data = []
+                    for cell in row.findall('.//w:tc', ns):
+                        # Extract all text in cell
+                        texts = cell.findall('.//w:t', ns)
+                        cell_text = "".join(t.text for t in texts if t.text)
+                        # Clean cell text
+                        cell_text = cell_text.replace('\n', ' ').replace('\t', ' ').strip()
+                        row_data.append(cell_text)
+                    if any(row_data):
+                        lines.append("\t".join(row_data))
+                lines.append("") # Empty line after table
+                
+        return "\n".join(lines)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Docx parsing error: {e}")
+        return ""
 
 
 class TemplateParseError(Exception):

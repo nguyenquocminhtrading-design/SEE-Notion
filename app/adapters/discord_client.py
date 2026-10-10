@@ -315,7 +315,12 @@ def setup_commands(bot: SEENotionBot) -> None:
             await interaction.response.defer(thinking=True)
             if file:
                 raw_bytes = await file.read()
-                text = raw_bytes.decode("utf-8", errors="replace")
+                filename = file.filename.lower()
+                if filename.endswith(".docx"):
+                    from app.services.template_parser import extract_text_from_docx
+                    text = extract_text_from_docx(raw_bytes)
+                else:
+                    text = raw_bytes.decode("utf-8", errors="replace")
 
             if not text or not text.strip():
                 await interaction.followup.send("❌ Vui lòng nhập `text` (nội dung hoặc URL) hoặc đính kèm `file` template.")
@@ -332,7 +337,11 @@ def setup_commands(bot: SEENotionBot) -> None:
                     async with httpx.AsyncClient(follow_redirects=True, timeout=15.0) as client:
                         resp = await client.get(text_clean)
                         if resp.status_code == 200:
-                            text = resp.text
+                            if text_clean.lower().endswith(".docx") or resp.headers.get("Content-Type") == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+                                from app.services.template_parser import extract_text_from_docx
+                                text = extract_text_from_docx(resp.content)
+                            else:
+                                text = resp.text
                         else:
                             await interaction.followup.send(
                                 f"❌ Không thể tải nội dung từ URL (mã lỗi HTTP {resp.status_code})."
@@ -343,7 +352,12 @@ def setup_commands(bot: SEENotionBot) -> None:
                     return
             elif os.path.exists(text_clean) and os.path.isfile(text_clean):
                 try:
-                    text = Path(text_clean).read_text(encoding="utf-8", errors="replace")
+                    if text_clean.lower().endswith(".docx"):
+                        from app.services.template_parser import extract_text_from_docx
+                        with open(text_clean, "rb") as f:
+                            text = extract_text_from_docx(f.read())
+                    else:
+                        text = Path(text_clean).read_text(encoding="utf-8", errors="replace")
                 except Exception as ex:
                     await interaction.followup.send(f"❌ Lỗi khi đọc file local: {ex}")
                     return
