@@ -133,32 +133,45 @@ Lấy key từ https://z.ai (hoặc nền tảng GLM bạn dùng) → điền `L
 ```bash
 cd "C:\Users\Acer\Desktop\My carrer\SEE Notion"
 .venv\Scripts\activate          # venv đã cài sẵn dependencies
-python -m app.main              # chạy app (FastAPI :8000 + bot + scheduler)
+python -m app.main              # chạy app (FastAPI :8001 + bot + scheduler)
 ```
 
 Kiểm tra:
 
 - Terminal thấy `Bot online: ...` → bot đã vào server Discord.
-- Trình duyệt mở http://127.0.0.1:8000/readyz → `db: ok`; `notion` sẽ ok khi token thật.
-- Trên Discord gõ: `/task assign tui làm demo trước ngày 30/09/2026` → bot hiện preview → bấm ✅ → task xuất hiện trong Notion.
+- Trình duyệt mở http://127.0.0.1:8001/readyz → `db: ok`; `notion` sẽ ok khi token thật.
+- Trên Discord gõ: `/create` hoặc `/task assign Minh, Cường làm báo cáo trước ngày 30/10/2026` → bot hiện preview → bấm ✅ → task xuất hiện trong Notion.
+- `/bulk-create` → tạo hàng loạt task từ biên bản họp (Meeting Minutes / TSV / Excel / CSV).
 - `/my` → xem task đang mở của bạn.
 
 ### Chạy test
 
 ```bash
 .venv\Scripts\activate
-python -m pytest tests -q       # 46 test, ~1 giây
+python -m pytest tests -q       # 46 unit tests, ~1 giây
 ```
 
-## Lệnh NL hỗ trợ (MVP)
+## Các Slash Commands & Tính năng hỗ trợ
 
-| Lệnh ví dụ                                           | Kết quả                                        |
-| ------------------------------------------------------- | ------------------------------------------------ |
-| "Assign Minh làm báo cáo trước ngày 30/09/2026"   | Preview → tạo task + gán người + nhắc hạn |
-| "Tạo task dọn kho deadline thứ 6 này ưu tiên cao" | Tạo task (thiếu người → hỏi)               |
-| "Dời task TSK-0003 sang 10/10"                         | Đổi deadline (có preview)                     |
-| "Task báo cáo xong rồi"                              | Chuyển Done                                     |
-| "Việc của tui có gì" hoặc`/my`                   | Liệt kê task đang mở                         |
+| Slash Command / Lệnh NL | Mô tả / Tính năng |
+| ------------------- | ----------------------------------------------------------------------------------- |
+| `/create` | Tạo task mới với hỗ trợ gán nhiều người (`assignees`: `Minh, Cường, Hân`). |
+| `/bulk-create` | Tạo hàng loạt task từ Meeting Minutes (Word/Excel/TSV, Bullet list, Bảng Markdown, CSV). Hỗ trợ dán text, truyền link URL (`http://...`), đính kèm file, hoặc đường dẫn file local server. |
+| `/update` | Cập nhật thông tin task (dời deadline, đổi người phụ trách, đổi ưu tiên...). |
+| `/complete` | Chuyển trạng thái task thành Done. |
+| `/my` | Liệt kê các task đang mở của bạn. |
+| `"Assign Minh, Cường..."` | Gán task cho nhiều người cùng lúc (tách bằng dấu phẩy `,`, từ `và`, dấu mũi tên `→`, hoặc ngoặc đơn). |
+
+### Tính năng xử lý bảng Meeting Minutes / Action Items thông minh trong `/bulk-create`:
+- **Tự động nhận diện PIC (Owner)**:
+  - `"Minh / [PIC bổ sung]"` ➔ gán cho **Minh**.
+  - `"Ánh → Cường"` ➔ gán đồng thời cho **Ánh** và **Cường**.
+  - `"Hân (Minh)"` ➔ gán đồng thời cho **Hân** và **Minh**.
+- **Tự động nhận diện Deadline & Status**:
+  - `"Xong 6/10"` ➔ Trạng thái **Done**, hạn chót `06/10/2026`.
+  - `"Done"` / `"done"` ➔ Trạng thái **Done**.
+  - `"2 tuần"` ➔ Tự động tính hạn chót = **Hôm nay + 14 ngày**.
+  - `"[DD/MM]"` ➔ Mặc định trạng thái **Not started**.
 
 **An toàn:** mọi hành động ghi đều hiện preview + cần bấm ✅ (hết hạn 10 phút); LLM chỉ parse JSON, không tự thực thi; archive luôn cần xác nhận rõ ràng.
 
@@ -166,24 +179,15 @@ python -m pytest tests -q       # 46 test, ~1 giây
 
 Mỗi 5 phút, hệ thống quét task đang mở trong Notion. Với mỗi task, tính các rule trong `config.yaml` (−3 ngày, −1 ngày, đúng hạn, quá hạn 1/4/7 ngày). Chống gửi trùng bằng ràng buộc UNIQUE trong SQLite — restart bao nhiêu lần cũng không gửi lặp, không sót (quét lại cửa sổ 30 ngày quá khứ). Task Done/Cancelled tự ngừng nhận reminder. Đổi deadline → reminder tự tính lại theo hạn mới.
 
-## Đổi LLM sang Ollama (khi sẵn sàng)
+## Cập nhật trên AlwaysData Server
 
 ```bash
-ollama pull qwen2.5:7b
-# .env: LLM_PROVIDER=ollama, LLM_MODEL=qwen2.5:7b
-python -m app.main
-```
-
-## Lưu ý quan trọng
-
-- **Property type trong Notion không đổi được sau khi tạo** — làm đúng Bước 1 ngay từ đầu.
-- Nếu không gán được Assignee qua API → kiểm tra người đó **đã là member của Notion workspace** chưa, và database đã share cho integration chưa.
-- `data/app.db` là dữ liệu vận hành — backup bằng cách copy file.
-- Secrets chỉ nằm trong `.env`; không commit, không log.
-
-
-# 2. SSH VÀO SERVER để pull code mới
-
+# 1. SSH vào server AlwaysData
 ssh seecodenotion@ssh-seecodenotion.alwaysdata.net
+
+# 2. Chuyển vào thư mục và pull code mới nhất
 cd /home/seecodenotion/SEE-Notion
 git pull origin main
+
+# 3. Vào Dashboard AlwaysData -> Advanced -> Services -> Bấm Restart service SEE_Notion_Bot
+```
