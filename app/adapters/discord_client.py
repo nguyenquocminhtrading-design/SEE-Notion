@@ -138,6 +138,7 @@ class BulkCompleteView(discord.ui.View):
             max_values=len(options), 
             options=options
         )
+        self.select.callback = self.on_task_select
         self.add_item(self.select)
         
         confirm_btn = discord.ui.Button(label="✅ Xác nhận", style=discord.ButtonStyle.success, row=1)
@@ -153,6 +154,9 @@ class BulkCompleteView(discord.ui.View):
             await interaction.response.send_message("Chỉ người gọi lệnh mới dùng được.", ephemeral=True)
             return False
         return True
+
+    async def on_task_select(self, interaction: discord.Interaction):
+        await interaction.response.defer()
 
     async def confirm(self, interaction: discord.Interaction):
         if not self.select.values:
@@ -282,9 +286,9 @@ def setup_commands(bot: SEENotionBot) -> None:
         start_date: str | None = None,
         description: str | None = None,
     ):
+        await interaction.response.defer(thinking=True)
         session = _new_session()
         try:
-            await interaction.response.defer(thinking=True)
             actor = get_actor_by_discord_id(session, interaction.user.id)
             today = datetime.now(get_settings().business_tz).date()
 
@@ -335,9 +339,9 @@ def setup_commands(bot: SEENotionBot) -> None:
     @bot.tree.command(name="update", description="Cập nhật task (VD: Dời TSK-001 sang 10/10)")
     @app_commands.describe(text="Lệnh cập nhật")
     async def update(interaction: discord.Interaction, text: str):
+        await interaction.response.defer(thinking=True)
         session = _new_session()
         try:
-            await interaction.response.defer(thinking=True)
             actor = get_actor_by_discord_id(session, interaction.user.id)
             today = datetime.now(get_settings().business_tz).date()
 
@@ -429,9 +433,9 @@ def setup_commands(bot: SEENotionBot) -> None:
 
     @bot.tree.command(name="my", description="Task đang mở của bạn")
     async def my(interaction: discord.Interaction):
+        await interaction.response.defer(thinking=True)
         session = _new_session()
         try:
-            await interaction.response.defer(thinking=True)
             actor = get_actor_by_discord_id(session, interaction.user.id)
             parsed = _parse_list_my()
             prep = await bot.flow.handle_query(parsed, actor=actor, session=session)
@@ -461,9 +465,9 @@ def setup_commands(bot: SEENotionBot) -> None:
         file: discord.Attachment | None = None,
         format: Literal["meeting", "csv"] | None = None,
     ):
+        await interaction.response.defer(thinking=True)
         session = _new_session()
         try:
-            await interaction.response.defer(thinking=True)
             if file:
                 raw_bytes = await file.read()
                 filename = file.filename.lower()
