@@ -23,8 +23,24 @@ class SEENotionBot(discord.Client):
         intents.message_content = False  # chỉ dùng slash command — không cần intent nhạy cảm
         super().__init__(intents=intents)
         self.tree = app_commands.CommandTree(self)
+        self.tree.on_error = self.on_tree_error
         self.container = container
         self.flow: CommandFlow = container.flow
+
+    async def on_tree_error(
+        self, interaction: discord.Interaction, error: app_commands.AppCommandError
+    ) -> None:
+        if isinstance(error, app_commands.CommandNotFound):
+            msg = "⚠️ Lệnh này chưa được đồng bộ trên Bot Server. Vui lòng báo Admin chạy `git pull` & restart bot server."
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message(msg, ephemeral=True)
+                else:
+                    await interaction.followup.send(msg, ephemeral=True)
+            except Exception:
+                pass
+            return
+        log.error("Unhandled command error: %s", error, exc_info=error)
 
     async def setup_hook(self) -> None:
         guild_id = get_settings().discord_guild_id
