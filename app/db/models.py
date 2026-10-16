@@ -39,10 +39,10 @@ class PendingAction(Base):
 
 
 class NotificationLog(Base):
-    """TRÁI TIM chống gửi trùng: UNIQUE(task_id, rule_key, due_date, channel)."""
+    """Chống gửi trùng theo từng người nhận và từng kênh."""
     __tablename__ = "notification_log"
     __table_args__ = (
-        UniqueConstraint("task_id", "rule_key", "due_date", "channel", name="uq_dedupe"),
+        UniqueConstraint("task_id", "rule_key", "due_date", "recipient", "channel", name="uq_dedupe"),
     )
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     task_id: Mapped[str] = mapped_column(Text, nullable=False)

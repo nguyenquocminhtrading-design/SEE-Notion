@@ -15,6 +15,7 @@ from app.adapters.notion_gateway import NotionGateway
 from app.config import load_yaml_config
 from app.db.models import NotificationLog
 from app.models.task import CLOSED_STATUSES
+from app.services.notification_preferences import accepts_channel
 
 log = logging.getLogger(__name__)
 
@@ -95,56 +96,56 @@ class ReminderEngine:
         return sent
 
     async def _dispatch_rule(self, session: Session, task: dict, rule: str, deadline: str) -> bool:
-        assignee_user = self._find_assignee_user(task)
+        assignee_users = self._find_assignee_users(task)
         title = task.get("title", "(không tên)")
         task_ref = task.get("task_id") or task.get("page_id", "?")
         sent_any = False
 
-        if "email" in self._channels.get(rule, []) and assignee_user:
-            entry = self._claim(session, task_id=task_ref, rule_key=rule, due_date=deadline,
-                                recipient=assignee_user.email, channel="email")
-            if entry:
-                await self._send_with_log(session, entry, lambda: self.email.send(
-                    assignee_user.email,
-                    f"[SEE Notion] {rule_label(rule, deadline)}: {title}",
-                    _email_body(task, rule, deadline, assignee_user.display_name),
-                ))
-                sent_any = True
+        for assignee_user in assignee_users:
+            if "email" in self._channels.get(rule, []) and assignee_user.email \
+                    and accepts_channel(assignee_user, "email"):
+                entry = self._claim(session, task_id=task_ref, rule_key=rule, due_date=deadline,
+                                    recipient=assignee_user.email, channel="email")
+                if entry:
+                    sent_any |= await self._send_with_log(session, entry, lambda u=assignee_user: self.email.send(
+                        u.email,
+                        f"[SEE Notion] {rule_label(rule, deadline)}: {title}",
+                        _email_body(task, rule, deadline, u.display_name),
+                    ))
 
-        if "discord_dm" in self._channels.get(rule, []) and assignee_user and self.discord_send \
-                and assignee_user.discord_id:
-            entry = self._claim(session, task_id=task_ref, rule_key=rule, due_date=deadline,
-                                recipient=assignee_user.discord_id, channel="discord_dm")
-            if entry:
-                try:
-                    await self.discord_send(assignee_user.discord_id,
-                                            f"⏰ {rule_label(rule, deadline)}: **{title}** "
-                                            f"({task_ref}, deadline {deadline})")
-                    entry.status, entry.delivered_at = "SENT", entry.created_at
-                    session.commit()
-                    sent_any = True
-                except Exception as e:  # DM best-effort, không block email
-                    entry.status, entry.error = "FAILED", str(e)[:300]
-                    session.commit()
-                    log.warning("Discord DM fail cho %s: %s", assignee_user.display_name, e)
+            if "discord_dm" in self._channels.get(rule, []) and self.discord_send \
+                    and assignee_user.discord_id and accepts_channel(assignee_user, "discord_dm"):
+                entry = self._claim(session, task_id=task_ref, rule_key=rule, due_date=deadline,
+                                    recipient=assignee_user.discord_id, channel="discord_dm")
+                if entry:
+                    try:
+                        await self.discord_send(assignee_user.discord_id,
+                                                f"⏰ {rule_label(rule, deadline)}: **{title}** "
+                                                f"({task_ref}, deadline {deadline})")
+                        entry.status, entry.delivered_at = "SENT", entry.created_at
+                        session.commit()
+                        sent_any = True
+                    except Exception as e:  # DM best-effort, không block email
+                        entry.status, entry.error = "FAILED", str(e)[:300]
+                        session.commit()
+                        log.warning("Discord DM fail cho %s: %s", assignee_user.display_name, e)
         return sent_any
 
-    def _find_assignee_user(self, task: dict):
+    def _find_assignee_users(self, task: dict) -> list:
         users = self.users_provider() if self.users_provider else []
         assignee_ids = set(task.get("assignee_ids") or [])
-        for u in users:
-            if u.notion_user_id and u.notion_user_id in assignee_ids:
-                return u
-        return None
+        return [u for u in users if u.notion_user_id and u.notion_user_id in assignee_ids]
 
-    async def _send_with_log(self, session: Session, entry: NotificationLog, send_fn) -> None:
+    async def _send_with_log(self, session: Session, entry: NotificationLog, send_fn) -> bool:
         entry.attempts += 1
         try:
             await send_fn()
             entry.status, entry.delivered_at = "SENT", entry.created_at
+            return True
         except Exception as e:
             entry.status, entry.error = "FAILED", str(e)[:300]
             log.error("Gửi email fail (task=%s rule=%s): %s", entry.task_id, entry.rule_key, e)
+            return False
         finally:
             session.commit()
 

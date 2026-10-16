@@ -11,6 +11,7 @@ from app.db.models import AuditLog, Counter
 from app.models.task import (
     validate_transition,
 )
+from app.services.notification_preferences import accepts_channel
 
 log = logging.getLogger(__name__)
 
@@ -112,6 +113,12 @@ class TaskService:
         effort: str | None = None,
     ) -> dict:
         """assignee_users: list of app.db.models.User hoặc None. Idempotent theo Task ID (§7.6)."""
+        missing_notion_ids = [u.display_name for u in assignee_users or [] if not u.notion_user_id]
+        if missing_notion_ids:
+            raise ValueError(
+                "Chưa thể tạo task vì các assignee chưa được map với Notion: "
+                + ", ".join(missing_notion_ids)
+            )
         task_id = self.next_task_id()
         assignee_notion_ids = []
         assignee_names = []
@@ -150,7 +157,7 @@ class TaskService:
         # Send assignment email to assignees
         if assignee_users:
             for u in assignee_users:
-                if u.email:
+                if u.email and accepts_channel(u, "email"):
                     try:
                         await self.email.send(
                             u.email,
@@ -210,6 +217,12 @@ class TaskService:
         return self.gateway.parse_task(page)
 
     async def reassign(self, *, actor_name: str, task: dict, new_assignees: list) -> dict:
+        missing_notion_ids = [u.display_name for u in new_assignees if not u.notion_user_id]
+        if missing_notion_ids:
+            raise ValueError(
+                "Chưa thể giao lại task vì các assignee chưa được map với Notion: "
+                + ", ".join(missing_notion_ids)
+            )
         assignee_notion_ids = []
         assignee_names = []
         for u in new_assignees:
@@ -228,7 +241,7 @@ class TaskService:
         # Send notification email to new assignees
         updated_task = self.gateway.parse_task(page)
         for u in new_assignees:
-            if u.email:
+            if u.email and accepts_channel(u, "email"):
                 try:
                     await self.email.send(
                         u.email,

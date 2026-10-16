@@ -1,5 +1,6 @@
 """APScheduler — 1 cron job quét reminder (mô hình scan, kế hoạch §10.1)."""
 import logging
+from datetime import datetime
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
@@ -28,5 +29,5 @@ def make_scheduler(container) -> AsyncIOScheduler:
 
     scheduler.add_job(reminder_tick, "interval", seconds=interval_seconds,
                       max_instances=1, coalesce=True, id="reminder_scan",
-                      next_run_time=None)  # tick đầu sau interval, không chạy ngay khi boot
+                      next_run_time=datetime.now(get_settings().business_tz))
     return scheduler

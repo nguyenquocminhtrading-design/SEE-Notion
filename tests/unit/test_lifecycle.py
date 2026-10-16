@@ -4,19 +4,19 @@ import pytest
 from app.models.task import ALLOWED_TRANSITIONS, validate_transition, TransitionError, is_overdue
 
 VALID = [
-    ("Pending", "In Progress"), ("Pending", "Done"), ("Pending", "Blocked"), ("Pending", "Cancelled"),
-    ("In Progress", "In Review"), ("In Progress", "Done"), ("In Progress", "Blocked"),
-    ("In Progress", "Cancelled"),
-    ("In Review", "In Progress"), ("In Review", "Done"), ("In Review", "Blocked"),
-    ("In Review", "Cancelled"),
-    ("Blocked", "Pending"), ("Blocked", "In Progress"), ("Blocked", "Cancelled"),
+    ("Not started", "In progress"), ("Not started", "Done"), ("Not started", "Blocked"), ("Not started", "Cancelled"),
+    ("In progress", "In review"), ("In progress", "Done"), ("In progress", "Blocked"),
+    ("In progress", "Cancelled"),
+    ("In review", "In progress"), ("In review", "Done"), ("In review", "Blocked"),
+    ("In review", "Cancelled"),
+    ("Blocked", "Not started"), ("Blocked", "In progress"), ("Blocked", "Cancelled"),
 ]
 INVALID = [
-    ("Pending", "In Review"),
-    ("In Progress", "Pending"),
-    ("In Review", "Pending"),
-    ("Done", "In Progress"), ("Done", "Pending"), ("Done", "Cancelled"),
-    ("Blocked", "In Review"), ("Blocked", "Done"),
+    ("Not started", "In review"),
+    ("In progress", "Not started"),
+    ("In review", "Not started"),
+    ("Done", "In progress"), ("Done", "Not started"), ("Done", "Cancelled"),
+    ("Blocked", "In review"), ("Blocked", "Done"),
     ("Cancelled", "Anything"),
 ]
 

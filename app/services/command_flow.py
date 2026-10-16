@@ -336,23 +336,6 @@ class CommandFlow:
                 description=payload["description"],
             )
 
-            if self.email and assignees:
-                for assignee in assignees:
-                    if assignee.email:
-                        subject = f"[Task Mới] Bạn có công việc mới: {task['title']}"
-                        body = (
-                            f"Chào {assignee.display_name},\n\n"
-                            f"Bạn vừa được giao một task mới từ hệ thống:\n"
-                            f"- Tên công việc: {task['title']}\n"
-                            f"- Deadline: {payload['deadline']}\n\n"
-                            f"Xem chi tiết tại Notion: {task['url']}\n\n"
-                            f"*Lưu ý: Task này sẽ tự động xuất hiện trên Notion Calendar của bạn.*\n"
-                        )
-                        try:
-                            await self.email.send(assignee.email, subject, body)
-                        except Exception as e:
-                            log.error(f"Lỗi khi gửi email cho {assignee.email}: {e}")
-
             assignee_names = (
                 ", ".join(a.display_name for a in assignees) if assignees else "(chưa gán)"
             )
@@ -433,23 +416,6 @@ class CommandFlow:
                     priority=task_payload["priority"],
                     description=task_payload.get("description"),
                 )
-
-                if self.email and assignees:
-                    for assignee in assignees:
-                        if assignee.email:
-                            subject = f"[Task Mới] Bạn có công việc mới: {task['title']}"
-                            body = (
-                                f"Chào {assignee.display_name},\n\n"
-                                f"Bạn vừa được giao một task mới từ hệ thống:\n"
-                                f"- Tên công việc: {task['title']}\n"
-                                f"- Deadline: {task_payload['deadline']}\n\n"
-                                f"Xem chi tiết tại Notion: {task['url']}\n\n"
-                                f"*Lưu ý: Task này sẽ tự động xuất hiện trên Notion Calendar của bạn.*\n"
-                            )
-                            try:
-                                await self.email.send(assignee.email, subject, body)
-                            except Exception as e:
-                                log.error(f"Lỗi khi gửi email cho {assignee.email}: {e}")
 
                 assignee_names = (
                     ", ".join(a.display_name for a in assignees) if assignees else "(chưa gán)"
