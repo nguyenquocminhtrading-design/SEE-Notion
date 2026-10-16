@@ -5,6 +5,7 @@ import logging
 
 from sqlalchemy.orm import Session
 
+from app.adapters.email.base import EmailSender
 from app.adapters.notion_gateway import NotionGateway
 from app.db.models import AuditLog, Counter
 from app.models.task import (
@@ -61,9 +62,10 @@ def build_properties(
 
 
 class TaskService:
-    def __init__(self, gateway: NotionGateway, session: Session):
+    def __init__(self, gateway: NotionGateway, session: Session, email_sender: EmailSender):
         self.gateway = gateway
         self.session = session
+        self.email = email_sender
 
     def _audit(
         self,
@@ -145,6 +147,19 @@ class TaskService:
                 "priority": priority,
             },
         )
+        # Send assignment email to assignees
+        if assignee_users:
+            for u in assignee_users:
+                if u.email:
+                    try:
+                        await self.email.send(
+                            u.email,
+                            f"[SEE Notion] Bạn đã được gán task: {task.get('title')}",
+                            f"Chào {u.display_name},\n\nBạn đã được gán task:\nTiêu đề: {task.get('title')}\nMã: {task.get('task_id')}\nDeadline: {task.get('deadline') or 'Chưa có'}\nTrạng thái: {task.get('status')}\n\nXem chi tiết trong Notion.\n\n— SEE Notion Bot"
+                        )
+                    except Exception as e:
+                        log.warning(f"Failed to send assignment email to {u.email}: {e}")
+
         return task
 
     # ---------- Tra cứu ----------
@@ -210,7 +225,19 @@ class TaskService:
             task.get("task_id", ""),
             {"assignee": {"new": assignee_names}},
         )
-        return self.gateway.parse_task(page)
+        # Send notification email to new assignees
+        updated_task = self.gateway.parse_task(page)
+        for u in new_assignees:
+            if u.email:
+                try:
+                    await self.email.send(
+                        u.email,
+                        f"[SEE Notion] Bạn đã được gán lại task: {updated_task.get('title')}",
+                        f"Chào {u.display_name},\n\nBạn đã được gán lại task:\nTiêu đề: {updated_task.get('title')}\nMã: {updated_task.get('task_id')}\nDeadline: {updated_task.get('deadline') or 'Chưa có'}\nTrạng thái: {updated_task.get('status')}\n\nXem chi tiết trong Notion.\n\n— SEE Notion Bot"
+                    )
+                except Exception as e:
+                    log.warning(f"Failed to send reassignment email to {u.email}: {e}")
+        return updated_task
 
     async def archive(self, *, actor_name: str, task: dict) -> dict:
         page = await self.gateway.update_task_page(task["page_id"], {}, archived=True)

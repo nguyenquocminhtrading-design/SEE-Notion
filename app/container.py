@@ -98,9 +98,9 @@ def build_container() -> Container:
     llm = make_llm_client()
     parser = ParserService(llm, team_names=[u["display_name"] for u in load_team()])
     gateway = NotionGateway()
-    tasks = TaskService(gateway, get_session())
-    confirmations = ConfirmationService()
     email = make_email_sender()
+    tasks = TaskService(gateway, get_session(), email)
+    confirmations = ConfirmationService()
     reminder = ReminderEngine(gateway, email)
     flow = CommandFlow(parser, tasks, users_provider=None, email=email)
     c = Container(gateway=gateway, parser=parser, tasks=tasks, flow=flow,
