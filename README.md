@@ -47,8 +47,7 @@ SEE Notion/
 **B. Tạo Database và lấy `NOTION_DATABASE_ID`**
 
 1. Tạo một trang mới trong Notion, chọn kiểu **Table** (Database) và đặt tên là `Tasks`.
-2. Tạo **đúng các property sau** (Lưu ý: Type của property không đổi được sau khi tạo):
-   | Property          | Type                                                                            |
+2. Tạo **đúng các property sau** (Lưu ý: Type của property không đổi được sau khi tạo):| Property          | Type                                                                            |
    | ----------------- | ------------------------------------------------------------------------------- |
    | Name              | Title                                                                           |
    | Status            | Status — options:`Pending, In Progress, In Review, Done, Blocked, Cancelled` |
@@ -153,16 +152,17 @@ python -m pytest tests -q       # 46 unit tests, ~1 giây
 
 ## Các Slash Commands & Tính năng hỗ trợ
 
-| Slash Command / Lệnh NL | Mô tả / Tính năng |
-| ------------------- | ----------------------------------------------------------------------------------- |
-| `/create` | Tạo task mới với hỗ trợ gán nhiều người (`assignees`: `Minh, Cường, Hân`). |
-| `/bulk-create` | Tạo hàng loạt task từ Meeting Minutes (Word/Excel/TSV, Bullet list, Bảng Markdown, CSV). Hỗ trợ dán text, truyền link URL (`http://...`), đính kèm file, hoặc đường dẫn file local server. |
-| `/update` | Cập nhật thông tin task (dời deadline, đổi người phụ trách, đổi ưu tiên...). |
-| `/complete` | Chuyển trạng thái task thành Done. |
-| `/my` | Liệt kê các task đang mở của bạn. |
-| `"Assign Minh, Cường..."` | Gán task cho nhiều người cùng lúc (tách bằng dấu phẩy `,`, từ `và`, dấu mũi tên `→`, hoặc ngoặc đơn). |
+| Slash Command / Lệnh NL      | Mô tả / Tính năng                                                                                                                                                                                         |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/create`                   | Tạo task mới với hỗ trợ gán nhiều người (`assignees`: `Minh, Cường, Hân`).                                                                                                                    |
+| `/bulk-create`              | Tạo hàng loạt task từ Meeting Minutes (Word/Excel/TSV, Bullet list, Bảng Markdown, CSV). Hỗ trợ dán text, truyền link URL (`http://...`), đính kèm file, hoặc đường dẫn file local server. |
+| `/update`                   | Cập nhật thông tin task (dời deadline, đổi người phụ trách, đổi ưu tiên...).                                                                                                                    |
+| `/complete`                 | Chuyển trạng thái task thành Done.                                                                                                                                                                        |
+| `/my`                       | Liệt kê các task đang mở của bạn.                                                                                                                                                                      |
+| `"Assign Minh, Cường..."` | Gán task cho nhiều người cùng lúc (tách bằng dấu phẩy `,`, từ `và`, dấu mũi tên `→`, hoặc ngoặc đơn).                                                                               |
 
 ### Tính năng xử lý bảng Meeting Minutes / Action Items thông minh trong `/bulk-create`:
+
 - **Tự động nhận diện PIC (Owner)**:
   - `"Minh / [PIC bổ sung]"` ➔ gán cho **Minh**.
   - `"Ánh → Cường"` ➔ gán đồng thời cho **Ánh** và **Cường**.

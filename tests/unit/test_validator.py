@@ -97,3 +97,42 @@ def test_parse_tsv_action_items():
     assert res[1]["assignee_names_raw"] == ["Ánh", "Cường"]
     assert res[2]["assignee_names_raw"] == ["Hân", "Minh"]
 
+
+def test_parse_docx_layout_one_and_two():
+    from pathlib import Path
+    from app.services.template_parser import parse_docx_template
+
+    layout_one = parse_docx_template(
+        Path("MEETING MINUTES FORMAT (1).docx").read_bytes(), "auto"
+    )
+    assert layout_one and layout_one[0]["layout_name"] == "Layout 1"
+
+    layout_two = parse_docx_template(
+        Path("[2026-10-20] Minute.docx").read_bytes(), "auto"
+    )
+    assert layout_two and layout_two[0]["layout_name"] == "Layout 2"
+    assert layout_two[0]["priority"] in {"High", "Medium", "Low"}
+
+
+def test_docx_layout_override_rejects_other_layout():
+    from pathlib import Path
+    from app.services.template_parser import LayoutParseError, parse_docx_template
+
+    with pytest.raises(LayoutParseError):
+        parse_docx_template(Path("[2026-10-20] Minute.docx").read_bytes(), "1")
+    with pytest.raises(LayoutParseError):
+        parse_docx_template(Path("MEETING MINUTES FORMAT (1).docx").read_bytes(), "2")
+
+
+def test_layout_two_priority_aliases_and_invalid_default():
+    from app.services.template_parser import _parse_docx_action_table
+
+    table = [
+        ["No.", "Action Item / Specific Task", "Expected Deliverable", "PIC (Owner)", "Deadline", "Mức độ urgent"],
+        ["1", "High task", "Output", "Minh", "25/10", "Urgent"],
+        ["2", "Low task", "Output", "Lan", "26/10", "not recognised"],
+    ]
+    result = _parse_docx_action_table(table, "2")
+    assert result[0]["priority"] == "High"
+    assert result[1]["priority"] == "Medium"
+

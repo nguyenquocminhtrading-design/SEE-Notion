@@ -452,11 +452,17 @@ def setup_commands(bot: SEENotionBot) -> None:
         text="Nội dung template (dán trực tiếp text văn bản)",
         file="File đính kèm (.txt, .csv, .md chứa nội dung họp/task)",
         format="Định dạng: 'meeting' cho meeting minutes, 'csv' cho CSV",
+        layout="Layout DOCX: auto, 1 (5 cột), hoặc 2 (6 cột)",
     )
     @app_commands.choices(
         format=[
             app_commands.Choice(name="Meeting Minutes", value="meeting"),
             app_commands.Choice(name="CSV", value="csv"),
+        ],
+        layout=[
+            app_commands.Choice(name="Tự động (Layout 1 → Layout 2)", value="auto"),
+            app_commands.Choice(name="Layout 1 — 5 cột", value="1"),
+            app_commands.Choice(name="Layout 2 — 6 cột + urgent", value="2"),
         ]
     )
     async def bulk_create(
@@ -464,16 +470,18 @@ def setup_commands(bot: SEENotionBot) -> None:
         text: str | None = None,
         file: discord.Attachment | None = None,
         format: Literal["meeting", "csv"] | None = None,
+        layout: Literal["auto", "1", "2"] = "auto",
     ):
         await interaction.response.defer(thinking=True)
         session = _new_session()
         try:
+            docx_bytes = None
             if file:
                 raw_bytes = await file.read()
                 filename = file.filename.lower()
                 if filename.endswith(".docx"):
-                    from app.services.template_parser import extract_text_from_docx
-                    text = extract_text_from_docx(raw_bytes)
+                    docx_bytes = raw_bytes
+                    text = "__DOCX__"
                 else:
                     text = raw_bytes.decode("utf-8", errors="replace")
 
@@ -493,8 +501,8 @@ def setup_commands(bot: SEENotionBot) -> None:
                         resp = await client.get(text_clean)
                         if resp.status_code == 200:
                             if text_clean.lower().endswith(".docx") or resp.headers.get("Content-Type") == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-                                from app.services.template_parser import extract_text_from_docx
-                                text = extract_text_from_docx(resp.content)
+                                docx_bytes = resp.content
+                                text = "__DOCX__"
                             else:
                                 text = resp.text
                         else:
@@ -508,9 +516,9 @@ def setup_commands(bot: SEENotionBot) -> None:
             elif os.path.exists(text_clean) and os.path.isfile(text_clean):
                 try:
                     if text_clean.lower().endswith(".docx"):
-                        from app.services.template_parser import extract_text_from_docx
                         with open(text_clean, "rb") as f:
-                            text = extract_text_from_docx(f.read())
+                            docx_bytes = f.read()
+                            text = "__DOCX__"
                     else:
                         text = Path(text_clean).read_text(encoding="utf-8", errors="replace")
                 except Exception as ex:
@@ -521,10 +529,17 @@ def setup_commands(bot: SEENotionBot) -> None:
             today = datetime.now(get_settings().business_tz).date()
 
             # Parse template
-            from app.services.template_parser import TemplateParseError, parse_template_input
+            from app.services.template_parser import LayoutParseError, TemplateParseError, parse_docx_template, parse_template_input
 
             try:
-                tasks_data = parse_template_input(text, format)
+                if docx_bytes is not None:
+                    tasks_data = parse_docx_template(docx_bytes, layout)
+                else:
+                    tasks_data = parse_template_input(text, format)
+            except LayoutParseError as e:
+                details = "\n".join(f"• {reason}" for reason in e.reasons[:4])
+                await interaction.followup.send(f"❌ {e.message}\n{details}")
+                return
             except TemplateParseError as e:
                 await interaction.followup.send(
                     f"❌ Lỗi parse template dòng {e.line_num}: {e.message}"
@@ -607,7 +622,12 @@ def setup_commands(bot: SEENotionBot) -> None:
                 return
 
             # Create combined preview with character limit safety (< 1900 chars)
-            body_lines = [f"📋 **Xác nhận tạo {len(all_payloads)} task:**\n"]
+            selected_layout = next((t.get("layout_name") for t in tasks_data if t.get("layout_name")), None)
+            layout_note = f"\n🧩 **{selected_layout}**" if selected_layout else ""
+            fallback_note = next((t.get("layout_reason") for t in tasks_data if t.get("layout_reason")), "")
+            if fallback_note:
+                layout_note += f" (fallback: {fallback_note})"
+            body_lines = [f"📋 **Xác nhận tạo {len(all_payloads)} task:**{layout_note}\n"]
             included_count = 0
 
             for line in all_summaries:

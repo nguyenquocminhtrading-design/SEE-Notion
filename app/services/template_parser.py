@@ -11,6 +11,104 @@ import zipfile
 import xml.etree.ElementTree as ET
 
 
+LAYOUTS = {
+    "1": {
+        "name": "Layout 1",
+        "headers": ["no.", "action item / specific task", "expected deliverable", "pic (owner)", "deadline"],
+    },
+    "2": {
+        "name": "Layout 2",
+        "headers": ["no.", "action item / specific task", "expected deliverable", "pic (owner)", "deadline", "mức độ urgent"],
+    },
+}
+
+
+class LayoutParseError(Exception):
+    """Structured error raised when no supported DOCX layout matches."""
+
+    def __init__(self, message: str, reasons: list[str] | None = None):
+        super().__init__(message)
+        self.message = message
+        self.reasons = reasons or []
+
+
+def _normalise_header(value: str) -> str:
+    return re.sub(r"\s+", " ", value.strip().lower().replace("–", "-")).strip()
+
+
+def extract_docx_tables(file_bytes: bytes) -> list[list[list[str]]]:
+    """Extract DOCX tables while preserving table and column boundaries."""
+    with zipfile.ZipFile(io.BytesIO(file_bytes)) as docx:
+        xml_content = docx.read("word/document.xml")
+    root = ET.fromstring(xml_content)
+    ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+    tables = []
+    for table in root.findall(".//w:tbl", ns):
+        rows = []
+        for row in table.findall("./w:tr", ns):
+            cells = []
+            for cell in row.findall("./w:tc", ns):
+                text = "".join(t.text or "" for t in cell.findall(".//w:t", ns))
+                cells.append(re.sub(r"\s+", " ", text.replace("\n", " ").replace("\t", " ")).strip())
+            if any(cells):
+                rows.append(cells)
+        if rows:
+            tables.append(rows)
+    return tables
+
+
+def _find_layout_table(tables: list[list[list[str]]], requested: str = "auto") -> tuple[list[list[str]], str, list[str]]:
+    candidates = ("1", "2") if requested == "auto" else (requested,)
+    reasons = []
+    for layout_id in candidates:
+        expected = LAYOUTS[layout_id]["headers"]
+        for table in tables:
+            header = [_normalise_header(c) for c in table[0]]
+            if len(header) != len(expected):
+                continue
+            if header == expected:
+                return table, layout_id, reasons
+            if len(header) >= 2 and header[1] == expected[1]:
+                reasons.append(f"{LAYOUTS[layout_id]['name']}: header hoặc số cột không khớp ({len(header)} cột)")
+    if not reasons:
+        reasons.append("Không tìm thấy bảng Action Items có header được hỗ trợ")
+    raise LayoutParseError("Không nhận diện được layout Meeting Minute", reasons)
+
+
+def _parse_docx_action_table(table: list[list[str]], layout_id: str) -> list[dict[str, Any]]:
+    today = datetime.now(UTC).date()
+    tasks = []
+    for row_num, row in enumerate(table[1:], start=2):
+        if len(row) != len(LAYOUTS[layout_id]["headers"]):
+            continue
+        title, deliverable, pic_raw, deadline_raw = row[1], row[2], row[3], row[4]
+        if not title.strip():
+            continue
+        deadline, status = parse_smart_deadline_and_status(deadline_raw, today)
+        if not deadline:
+            deadline = (today + timedelta(days=7)).isoformat()
+        priority = "Medium"
+        if layout_id == "2":
+            priority_map = {"high": "High", "urgent": "High", "critical": "High", "cao": "High", "medium": "Medium", "normal": "Medium", "trung bình": "Medium", "low": "Low", "thấp": "Low"}
+            priority = priority_map.get(_normalise_header(row[5]), "Medium")
+        tasks.append({"title": title, "description": deliverable, "assignee_names_raw": parse_pic_names(pic_raw), "deadline": deadline, "priority": priority, "status": status, "task_type": "", "effort": "", "start_date": "", "line_num": row_num, "layout": layout_id})
+    if not tasks:
+        raise LayoutParseError(f"{LAYOUTS[layout_id]['name']} không có dòng task hợp lệ")
+    return tasks
+
+
+def parse_docx_template(file_bytes: bytes, layout: str = "auto") -> list[dict[str, Any]]:
+    if layout not in {"auto", "1", "2"}:
+        raise LayoutParseError("layout phải là auto, 1 hoặc 2")
+    table, layout_id, reasons = _find_layout_table(extract_docx_tables(file_bytes), layout)
+    tasks = _parse_docx_action_table(table, layout_id)
+    for task in tasks:
+        task["layout_name"] = LAYOUTS[layout_id]["name"]
+        task["layout_fallback"] = layout == "auto" and layout_id == "2"
+        task["layout_reason"] = reasons[-1] if task["layout_fallback"] and reasons else ""
+    return tasks
+
+
 def extract_text_from_docx(file_bytes: bytes) -> str:
     """Extract text from docx, formatting tables as TSV for parser."""
     try:
