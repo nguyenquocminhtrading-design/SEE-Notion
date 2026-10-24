@@ -10,6 +10,21 @@ ssh seecodenotion@ssh-seecodenotion.alwaysdata.net
 ssh seecodenotion@ssh-seecodenotion.alwaysdata.net
 ```
 
+```bash
+ssh seecodenotion@ssh-seecodenotion.alwaysdata.net
+```
+
+
+```bash
+ssh seecodenotion@ssh-seecodenotion.alwaysdata.net
+```
+
+
+```bash
+. SSH vào server AlwaysData
+ssh seecodenotion@ssh-seecodenotion.alwaysdata.net
+```
+
 
 # Hướng Dẫn Deploy Bot Lên AlwaysData Miễn Phí 100%
 

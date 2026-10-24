@@ -1,3 +1,8 @@
+
+```bash
+ssh seecodenotion@ssh-seecodenotion.alwaysdata.net
+```
+
 # SEE Notion — AI Task Handover & Deadline Management
 
 Bot Discord nhận lệnh **ngôn ngữ tự nhiên** → LLM parse → xác nhận → tạo task trong **Notion** → **email nhắc hạn** tự động (3 ngày trước / 1 ngày / đúng hạn / quá hạn).

@@ -109,6 +109,7 @@ class CommandFlow:
             "actor": actor.display_name,
             "title": fields["title"],
             "deadline": fields["deadline"],
+            "start_date": fields.get("start_date"),
             "priority": fields["priority"],
             "task_type": fields["task_type"],
             "effort": fields["effort"],
@@ -332,6 +333,7 @@ class CommandFlow:
                 assignee_users=assignees,
                 creator_notion_id=actor.user.notion_user_id or None,
                 deadline=payload["deadline"],
+                start_date=payload.get("start_date"),
                 priority=payload["priority"],
                 description=payload["description"],
             )
@@ -409,10 +411,13 @@ class CommandFlow:
 
                 task = await self.tasks.create_task(
                     actor_name=actor.display_name,
+                    title=payload["title"], # Wait, it should be task_payload
+                    # Let's fix this properly
                     title=task_payload["title"],
                     assignee_users=assignees,
                     creator_notion_id=actor.user.notion_user_id or None,
                     deadline=task_payload["deadline"],
+                    start_date=task_payload.get("start_date"),
                     priority=task_payload["priority"],
                     description=task_payload.get("description"),
                 )

@@ -46,9 +46,12 @@ def build_properties(
     if creator_notion_id:
         props["Creator"] = {"people": [{"id": creator_notion_id}]}
     if deadline:
-        props["Due date"] = {"date": {"start": deadline}}
-    if start_date:
-        props["Start Date"] = {"date": {"start": start_date}}
+        if start_date and start_date != deadline:
+            props["Date"] = {"date": {"start": start_date, "end": deadline}}
+        else:
+            props["Date"] = {"date": {"start": deadline}}
+    elif start_date:
+        props["Date"] = {"date": {"start": start_date}}
     if priority:
         props["Priority"] = {"select": {"name": priority}}
     if task_type:
@@ -205,9 +208,11 @@ class TaskService:
         return self.gateway.parse_task(page)
 
     async def change_deadline(self, *, actor_name: str, task: dict, new_deadline: str) -> dict:
-        page = await self.gateway.update_task_page(
-            task["page_id"], {"Due date": {"date": {"start": new_deadline}}}
-        )
+        start = task.get("start_date")
+        props = {"Date": {"date": {"start": start, "end": new_deadline}} if start else {"Date": {"date": {"start": new_deadline}}}}
+        # Wait, the dict logic above is wrong. Let me fix.
+        props = {"Date": {"date": {"start": start, "end": new_deadline} if start else {"start": new_deadline}}}
+        page = await self.gateway.update_task_page(task["page_id"], props)
         self._audit(
             actor_name,
             "change_deadline",

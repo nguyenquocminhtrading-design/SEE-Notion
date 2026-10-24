@@ -94,7 +94,12 @@ class NotionGateway:
             ]
         }
         if deadline_on_or_before:
-            flt["and"].append({"property": "Due date", "date": {"on_or_before": deadline_on_or_before}})
+            flt["and"].append({
+                "or": [
+                    {"property": "Date", "date": {"on_or_before": deadline_on_or_before}},
+                    {"property": "Due date", "date": {"on_or_before": deadline_on_or_before}},
+                ]
+            })
         return await self._query_database(flt)
 
     async def query_by_title(self, title_hint: str) -> list[dict]:
@@ -146,14 +151,22 @@ class NotionGateway:
         status_obj = p.get("Status", {}).get("status", {})
         people = [u.get("id") for u in p.get("Assignee", {}).get("people", [])]
         task_types = [o.get("name") for o in p.get("Task type", {}).get("multi_select", [])]
+
+        date_obj = p.get("Date", {}).get("date") or p.get("Due date", {}).get("date")
+        start_d = date_obj.get("start") if date_obj else None
+        end_d = date_obj.get("end") if date_obj else None
+
+        deadline_val = end_d or start_d
+        start_date_val = start_d if end_d else date_of("Start Date")
+
         return {
             "page_id": page.get("id"),
             "task_id": rt("Task ID (system)") or None,
             "title": "".join(t.get("plain_text", "") for t in p.get("Task name", {}).get("title", [])),
             "status": status_obj.get("name"),
             "assignee_ids": people,
-            "deadline": date_of("Due date"),
-            "start_date": date_of("Start Date"),
+            "deadline": deadline_val,
+            "start_date": start_date_val,
             "priority": (p.get("Priority", {}).get("select") or {}).get("name"),
             "task_type": ", ".join(task_types) if task_types else None,
             "effort": (p.get("Effort level", {}).get("select") or {}).get("name"),

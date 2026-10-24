@@ -84,14 +84,25 @@ def _parse_docx_action_table(table: list[list[str]], layout_id: str) -> list[dic
         title, deliverable, pic_raw, deadline_raw = row[1], row[2], row[3], row[4]
         if not title.strip():
             continue
-        deadline, status = parse_smart_deadline_and_status(deadline_raw, today)
-        if not deadline:
-            deadline = (today + timedelta(days=7)).isoformat()
+        start_date, deadline, status = parse_smart_deadline_and_status(deadline_raw, today)
         priority = "Medium"
         if layout_id == "2":
             priority_map = {"high": "High", "urgent": "High", "critical": "High", "cao": "High", "medium": "Medium", "normal": "Medium", "trung bình": "Medium", "low": "Low", "thấp": "Low"}
             priority = priority_map.get(_normalise_header(row[5]), "Medium")
-        tasks.append({"title": title, "description": deliverable, "assignee_names_raw": parse_pic_names(pic_raw), "deadline": deadline, "priority": priority, "status": status, "task_type": "", "effort": "", "start_date": "", "line_num": row_num, "layout": layout_id})
+        
+        tasks.append({
+            "title": title, 
+            "description": deliverable, 
+            "assignee_names_raw": parse_pic_names(pic_raw), 
+            "deadline": deadline,
+            "start_date": start_date or "",
+            "priority": priority, 
+            "status": status, 
+            "task_type": "", 
+            "effort": "", 
+            "line_num": row_num, 
+            "layout": layout_id
+        })
     if not tasks:
         raise LayoutParseError(f"{LAYOUTS[layout_id]['name']} không có dòng task hợp lệ")
     return tasks
@@ -188,53 +199,68 @@ def parse_pic_names(raw: str) -> list[str]:
     return names
 
 
-def parse_smart_deadline_and_status(raw: str, today: Any) -> tuple[str | None, str]:
+def parse_smart_deadline_and_status(raw: str, today: Any) -> tuple[str | None, str | None, str]:
     """Parse deadline string and status intelligently.
-
+    Hỗ trợ format: "start_date - end_date"
+    
     Examples:
-    - "Xong 6/10" -> ("2026-10-06", "Done")
-    - "Done" / "done" -> (today.isoformat(), "Done")
-    - "2 tuần" -> (today + 14 days, "Not started")
-    - "[DD/MM]" -> (None, "Not started")
+    - "24/10/2026 - 30/10/2026" -> ("2026-10-24", "2026-10-30", "Not started")
     """
     if not raw:
-        return None, "Not started"
+        return None, None, "Not started"
 
     raw_clean = raw.strip()
     status = "Not started"
 
-    # Check for Done / Xong
+    # Check Done
     is_done = False
     if re.search(r"\b(done|xong)\b", raw_clean, re.IGNORECASE):
         is_done = True
         status = "Done"
 
-    # Clean words "Xong", "Done" to extract date
     date_text = re.sub(r"\b(done|xong)\b", "", raw_clean, flags=re.IGNORECASE).strip()
 
-    # Check "N tuần"
-    week_match = re.search(r"(\d+)\s*tuần", raw_clean, re.IGNORECASE)
-    if week_match:
-        weeks = int(week_match.group(1))
-        return (today + timedelta(days=weeks * 7)).isoformat(), status
+    # Xử lý range: "DD/MM/YYYY - DD/MM/YYYY" hoặc "DD/MM - DD/MM"
+    if "-" in date_text:
+        parts = date_text.split("-")
+        if len(parts) == 2:
+            start_str = parts[0].strip()
+            end_str = parts[1].strip()
+            start_date = try_parse_date_simple(start_str, today)
+            end_date = try_parse_date_simple(end_str, today)
+            if start_date and end_date:
+                return start_date, end_date, status
 
-    # Check "N ngày"
-    day_match = re.search(r"(\d+)\s*ngày", raw_clean, re.IGNORECASE)
-    if day_match:
-        days = int(day_match.group(1))
-        return (today + timedelta(days=days)).isoformat(), status
-
-    # Extract DD/MM/YYYY or DD/MM pattern
-    date_match = re.search(r"(\d{1,2}/\d{1,2}(?:/\d{4})?)", raw_clean)
+    # Fallback cho ngày đơn
+    # Extract single date
+    date_match = re.search(r"(\d{1,2}/\d{1,2}(?:/\d{4})?)", date_text)
     if date_match:
         parsed_date = try_parse_date_simple(date_match.group(1), today)
         if parsed_date:
-            return parsed_date, status
+            # Nếu ngày là hôm nay, cho deadline mặc định là 7 ngày tới
+            if parsed_date == today.isoformat():
+                return today.isoformat(), (today + timedelta(days=7)).isoformat(), status
+            return None, parsed_date, status
 
     if is_done:
-        return today.isoformat(), "Done"
+        return None, today.isoformat(), "Done"
 
-    return None, status
+    # Nếu không có deadline cụ thể, mặc định hôm nay là start, 7 ngày tới là deadline
+    return today.isoformat(), (today + timedelta(days=7)).isoformat(), status
+    date_match = re.search(r"(\d{1,2}/\d{1,2}(?:/\d{4})?)", date_text)
+    if date_match:
+        parsed_date = try_parse_date_simple(date_match.group(1), today)
+        if parsed_date:
+            # Nếu ngày là hôm nay, cho deadline mặc định là 7 ngày tới
+            if parsed_date == today.isoformat():
+                return today.isoformat(), (today + timedelta(days=7)).isoformat(), status
+            return None, parsed_date, status
+
+    if is_done:
+        return None, today.isoformat(), "Done"
+
+    # Nếu không có deadline cụ thể, mặc định hôm nay là start, 7 ngày tới là deadline
+    return today.isoformat(), (today + timedelta(days=7)).isoformat(), status
 
 
 def parse_tsv_action_items(text: str) -> list[dict[str, Any]]:
@@ -312,7 +338,7 @@ def parse_tsv_action_items(text: str) -> list[dict[str, Any]]:
         assignees = parse_pic_names(pic_raw)
 
         # Parse Deadline and Status
-        deadline, status = parse_smart_deadline_and_status(deadline_raw, today)
+        start_date, deadline, status = parse_smart_deadline_and_status(deadline_raw, today)
 
         # Default deadline if missing
         if not deadline:
@@ -331,7 +357,7 @@ def parse_tsv_action_items(text: str) -> list[dict[str, Any]]:
                 "status": status,
                 "task_type": "",
                 "effort": "",
-                "start_date": "",
+                "start_date": start_date or today.isoformat(),
                 "line_num": i,
             }
         )
@@ -438,6 +464,7 @@ def build_task_dict(fields: dict[str, str], line_num: int) -> dict[str, Any]:
     if priority not in ("High", "Medium", "Low"):
         priority = "Medium"
 
+    today_iso = today.isoformat()
     return {
         "title": fields["task"],
         "assignee_names_raw": assignees,
@@ -447,7 +474,7 @@ def build_task_dict(fields: dict[str, str], line_num: int) -> dict[str, Any]:
         "description": fields.get("description", ""),
         "task_type": fields.get("type", ""),
         "effort": fields.get("effort", ""),
-        "start_date": fields.get("start_date", ""),
+        "start_date": fields.get("start_date") or today_iso,
         "line_num": line_num,
     }
 
