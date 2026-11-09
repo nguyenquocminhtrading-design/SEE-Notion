@@ -85,3 +85,4 @@ def test_link_discord_account_duplicate_discord_id(test_session):
 def test_link_discord_account_email_not_found(test_session):
     with pytest.raises(ValueError, match="Không tìm thấy người dùng"):
         link_discord_account(test_session, "nonexistent@vgu.edu.vn", "777777")
+

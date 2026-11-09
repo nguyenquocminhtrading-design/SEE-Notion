@@ -1,139 +1,172 @@
-# Danh bạ team — nguồn sự thật cho email + Discord ID.
-# Mọi người phải nằm trong danh sách "users:" (không tạo key khác).
 users:
-  - display_name: "Minh" # tên dùng trong lệnh NL ("assign cho Minh")
-    full_name: "Quốc Minh"
-    email: "songminh688@gmail.com"
-    discord_id: "661748766990270465" # Discord user ID của bạn
-    notion_user_id: "3a1d872b-594c-81b8-bf14-0002673b336a" # account "SEE Club" trong Notion workspace (email Notion: see.club@vgu.edu.vn)
-    role: admin
-    prefs:
-      email: true
-      discord_dm: true
-  - display_name: "Cường"
-    full_name: "Trương Phước Minh Cường"
-    email: "10523006@student.vgu.edu.vn"
-    discord_id: "351176931997384704"
-    notion_user_id: "184d872b-594c-816d-8f59-0002bfd786d5"
-    role: member
-    prefs: { email: true, discord_dm: true }
-  - display_name: "Hân"
-    full_name: "Hàng Gia Hân"
-    email: "10623011@student.vgu.edu.vn"
-    discord_id: ""
-    notion_user_id: "1ebd872b594c815d84d00002a121c87c"
-    role: member
-    prefs: { email: true, discord_dm: true }
-  - display_name: "Ánh"
-    full_name: "Hồng Ánh"
-    email: "10725018@student.vgu.edu.vn"
-    discord_id: ""
-    notion_user_id: "3e6d872b594c81449c1e000211ff8e86"
-    role: member
-    prefs: { email: true, discord_dm: true }
-  - display_name: "Khôi"
-    full_name: "Lê Quang Khôi"
-    email: "11525023@student.vgu.edu.vn"
-    discord_id: ""
-    notion_user_id: "3f1d872b594c8130805f0002fb858cd2"
-    role: member
-    prefs: { email: true, discord_dm: true }
-  - display_name: "Yến"
-    full_name: "Nguyễn Thị Hồng Yến"
-    email: "10725019@student.vgu.edu.vn"
-    discord_id: ""
-    notion_user_id: "3f1d872b594c81229d0900027e7b8166"
-    role: member
-    prefs: { email: true, discord_dm: true }
-  - display_name: "Quý"
-    full_name: "Phạm Trọng Quý"
-    email: "104240232@student.vgu.edu.vn"
-    discord_id: ""
-    notion_user_id: "112d872b-594c-8108-b85b-0002d09062ee"
-    role: member
-    prefs: { email: true, discord_dm: true }
-  - display_name: "Nguyễn Minh Thảo Nguyên"
-    full_name: "Nguyễn Minh Thảo Nguyên"
-    email: "10426079@student.vgu.edu.vn"
-    discord_id: ""
-    notion_user_id: "409d872b-594c-819c-8d59-000211d47026"
-    role: member
-    prefs: { email: true, discord_dm: true }
-  - display_name: "Nhật Anh"
-    full_name: "Nguyễn Nhật Anh"
-    email: "105240380@student.vgu.edu.vn"
-    discord_id: ""
-    notion_user_id: "10ad872b-594c-8109-8228-00025658edc9"
-    role: member
-    prefs: { email: true, discord_dm: true }
-  - display_name: "Đồng"
-    full_name: "Trương Gia Đồng"
-    email: "11025043@student.vgu.edu.vn"
-    discord_id: ""
-    notion_user_id: "409d872b-594c-81b9-b0db-0002335dcdbc"
-    role: member
-    prefs: { email: true, discord_dm: true }
-  - display_name: "Thùy"
-    full_name: "Nguyễn Thị Ngọc Thùy"
-    email: "107240106@student.vgu.edu.vn"
-    discord_id: ""
-    notion_user_id: "295d872b-594c-813d-8530-0002875dce90"
-    role: member
-    prefs: { email: true, discord_dm: true }
-  - display_name: "Châu Anh"
-    full_name: "Lê Nguyễn Châu Anh"
-    email: "11126005@student.vgu.edu.vn"
-    discord_id: ""
-    notion_user_id: "3c5d872b-594c-8101-b654-00029a4494f8"
-    role: member
-    prefs: { email: true, discord_dm: true }
-  - display_name: "Dung"
-    full_name: "Phan Hoàng Thanh Dung"
-    email: "10826010@student.vgu.edu.vn"
-    discord_id: ""
-    notion_user_id: "409d872b-594c-81f9-9e78-00023647f633"
-    role: member
-    prefs: { email: true, discord_dm: true }
-  - display_name: "Nhân"
-    full_name: "Lê Đức Nhân"
-    email: "10225086@student.vgu.edu.vn"
-    discord_id: ""
-    notion_user_id: "409d872b-594c-819b-a467-0002021811c0"
-    role: member
-    prefs: { email: true, discord_dm: true }
-  - display_name: "Anh Thư"
-    full_name: "Nguyễn Mai Anh Thư"
-    email: "11025034@student.vgu.edu.vn"
-    discord_id: ""
-    notion_user_id: "409d872b-594c-8179-879a-0002527f464e"
-    role: member
-    prefs: { email: true, discord_dm: true }
-  - display_name: "Khanh"
-    full_name: "Nguyễn Như Khanh"
-    email: "11025009@student.vgu.edu.vn"
-    discord_id: ""
-    notion_user_id: "269d872b-594c-81de-bd18-0002c71ad197"
-    role: member
-    prefs: { email: true, discord_dm: true }
-  - display_name: "Nguyễn Thảo Nguyên"
-    full_name: "Nguyễn Thảo Nguyên"
-    email: "10725002@student.vgu.edu.vn"
-    discord_id: ""
-    notion_user_id: "409d872b-594c-8155-95d5-000211b2dd00"
-    role: member
-    prefs: { email: true, discord_dm: true }
-  - display_name: "Uyên"
-    full_name: "Trương Hồng Uyên"
-    email: "11025032@student.vgu.edu.vn"
-    discord_id: ""
-    notion_user_id: "409d872b-594c-8150-a3cf-0002608972ec"
-    role: member
-    prefs: { email: true, discord_dm: true }
-  - display_name: "Công"
-    full_name: "Trịnh Thế Công"
-    email: "10525007@student.vgu.edu.vn"
-    discord_id: ""
-    notion_user_id: "409d872b-594c-81ad-a2ec-00022a1f3c65"
-    role: member
-    prefs: { email: true, discord_dm: true }
-
+- display_name: Minh
+  full_name: Quốc Minh
+  email: songminh688@gmail.com
+  discord_id: '661748766990270465'
+  notion_user_id: 3a1d872b-594c-81b8-bf14-0002673b336a
+  role: admin
+  prefs:
+    email: true
+    discord_dm: true
+- display_name: Cường
+  full_name: Trương Phước Minh Cường
+  email: 10523006@student.vgu.edu.vn
+  discord_id: '351176931997384704'
+  notion_user_id: 184d872b-594c-816d-8f59-0002bfd786d5
+  role: member
+  prefs:
+    email: true
+    discord_dm: true
+- display_name: Hân
+  full_name: Hàng Gia Hân
+  email: 10623011@student.vgu.edu.vn
+  discord_id: ''
+  notion_user_id: 1ebd872b594c815d84d00002a121c87c
+  role: member
+  prefs:
+    email: true
+    discord_dm: true
+- display_name: Ánh
+  full_name: Hồng Ánh
+  email: 10725018@student.vgu.edu.vn
+  discord_id: ''
+  notion_user_id: 3e6d872b594c81449c1e000211ff8e86
+  role: member
+  prefs:
+    email: true
+    discord_dm: true
+- display_name: Khôi
+  full_name: Lê Quang Khôi
+  email: 11525023@student.vgu.edu.vn
+  discord_id: ''
+  notion_user_id: 3f1d872b594c8130805f0002fb858cd2
+  role: member
+  prefs:
+    email: true
+    discord_dm: true
+- display_name: Yến
+  full_name: Nguyễn Thị Hồng Yến
+  email: 10725019@student.vgu.edu.vn
+  discord_id: ''
+  notion_user_id: 3f1d872b594c81229d0900027e7b8166
+  role: member
+  prefs:
+    email: true
+    discord_dm: true
+- display_name: Quý
+  full_name: Phạm Trọng Quý
+  email: 104240232@student.vgu.edu.vn
+  discord_id: ''
+  notion_user_id: 112d872b-594c-8108-b85b-0002d09062ee
+  role: member
+  prefs:
+    email: true
+    discord_dm: true
+- display_name: Nguyễn Minh Thảo Nguyên
+  full_name: Nguyễn Minh Thảo Nguyên
+  email: 10426079@student.vgu.edu.vn
+  discord_id: ''
+  notion_user_id: 409d872b-594c-819c-8d59-000211d47026
+  role: member
+  prefs:
+    email: true
+    discord_dm: true
+- display_name: Nhật Anh
+  full_name: Nguyễn Nhật Anh
+  email: 105240380@student.vgu.edu.vn
+  discord_id: ''
+  notion_user_id: 10ad872b-594c-8109-8228-00025658edc9
+  role: member
+  prefs:
+    email: true
+    discord_dm: true
+- display_name: Đồng
+  full_name: Trương Gia Đồng
+  email: 11025043@student.vgu.edu.vn
+  discord_id: ''
+  notion_user_id: 409d872b-594c-81b9-b0db-0002335dcdbc
+  role: member
+  prefs:
+    email: true
+    discord_dm: true
+- display_name: Thùy
+  full_name: Nguyễn Thị Ngọc Thùy
+  email: 107240106@student.vgu.edu.vn
+  discord_id: ''
+  notion_user_id: 295d872b-594c-813d-8530-0002875dce90
+  role: member
+  prefs:
+    email: true
+    discord_dm: true
+- display_name: Châu Anh
+  full_name: Lê Nguyễn Châu Anh
+  email: 11126005@student.vgu.edu.vn
+  discord_id: ''
+  notion_user_id: 3c5d872b-594c-8101-b654-00029a4494f8
+  role: member
+  prefs:
+    email: true
+    discord_dm: true
+- display_name: Dung
+  full_name: Phan Hoàng Thanh Dung
+  email: 10826010@student.vgu.edu.vn
+  discord_id: ''
+  notion_user_id: 409d872b-594c-81f9-9e78-00023647f633
+  role: member
+  prefs:
+    email: true
+    discord_dm: true
+- display_name: Nhân
+  full_name: Lê Đức Nhân
+  email: 10225086@student.vgu.edu.vn
+  discord_id: ''
+  notion_user_id: 409d872b-594c-819b-a467-0002021811c0
+  role: member
+  prefs:
+    email: true
+    discord_dm: true
+- display_name: Anh Thư
+  full_name: Nguyễn Mai Anh Thư
+  email: 11025034@student.vgu.edu.vn
+  discord_id: ''
+  notion_user_id: 409d872b-594c-8179-879a-0002527f464e
+  role: member
+  prefs:
+    email: true
+    discord_dm: true
+- display_name: Khanh
+  full_name: Nguyễn Như Khanh
+  email: 11025009@student.vgu.edu.vn
+  discord_id: ''
+  notion_user_id: 269d872b-594c-81de-bd18-0002c71ad197
+  role: member
+  prefs:
+    email: true
+    discord_dm: true
+- display_name: Nguyễn Thảo Nguyên
+  full_name: Nguyễn Thảo Nguyên
+  email: 10725002@student.vgu.edu.vn
+  discord_id: ''
+  notion_user_id: 409d872b-594c-8155-95d5-000211b2dd00
+  role: member
+  prefs:
+    email: true
+    discord_dm: true
+- display_name: Uyên
+  full_name: Trương Hồng Uyên
+  email: 11025032@student.vgu.edu.vn
+  discord_id: ''
+  notion_user_id: 409d872b-594c-8150-a3cf-0002608972ec
+  role: member
+  prefs:
+    email: true
+    discord_dm: true
+- display_name: Công
+  full_name: Trịnh Thế Công
+  email: 10525007@student.vgu.edu.vn
+  discord_id: ''
+  notion_user_id: 409d872b-594c-81ad-a2ec-00022a1f3c65
+  role: member
+  prefs:
+    email: true
+    discord_dm: true
