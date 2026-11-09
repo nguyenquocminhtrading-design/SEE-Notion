@@ -739,6 +739,99 @@ def setup_commands(bot: SEENotionBot) -> None:
         finally:
             session.close()
 
+    @bot.tree.command(name="sync-team", description="[Admin] Đọc lại team.yaml và đồng bộ toàn bộ danh bạ thành viên vào hệ thống")
+    async def sync_team(interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        session = get_session()
+        try:
+            actor = get_actor_by_discord_id(session, interaction.user.id)
+            if not actor.is_admin:
+                await interaction.followup.send("🔒 Lệnh này chỉ dành cho Admin.", ephemeral=True)
+                return
+
+            from app.services.authz import seed_users_from_yaml
+            from app.config import load_team
+            team_entries = load_team()
+            count = seed_users_from_yaml(session)
+            with_discord = sum(1 for u in team_entries if str(u.get("discord_id", "")).strip())
+            with_notion = sum(1 for u in team_entries if str(u.get("notion_user_id", "")).strip())
+
+            await interaction.followup.send(
+                f"🔄 **Đã đồng bộ thành công danh bạ `team.yaml` vào hệ thống!**\n"
+                f"• Tổng số thành viên: **{count}**\n"
+                f"• Đã có Discord ID: **{with_discord}/{count}**\n"
+                f"• Đã link Notion ID: **{with_notion}/{count}**\n\n"
+                f"💡 *Mẹo: Khi bạn sửa file `team.yaml` (thêm thành viên, đổi discord_id hay notion_user_id), chỉ cần gõ lệnh `/sync-team` này là bot sẽ cập nhật ngay lập tức mà không cần khởi động lại server.*",
+                ephemeral=True
+            )
+        except NotAuthorized as e:
+            await interaction.followup.send(f"🔒 {e}", ephemeral=True)
+        except Exception:
+            log.exception("Sync team fail")
+            await interaction.followup.send("❌ Đã có lỗi xảy ra khi đồng bộ team.yaml.", ephemeral=True)
+        finally:
+            session.close()
+
+    @bot.tree.command(name="link-batch", description="[Admin] Nạp danh sách liên kết Discord ID hàng loạt")
+    @app_commands.describe(
+        text="Nhập mỗi dòng: <email> <discord_id hoặc @mention>"
+    )
+    async def link_batch(interaction: discord.Interaction, text: str):
+        await interaction.response.defer(ephemeral=True)
+        session = get_session()
+        try:
+            actor = get_actor_by_discord_id(session, interaction.user.id)
+            if not actor.is_admin:
+                await interaction.followup.send("🔒 Lệnh này chỉ dành cho Admin.", ephemeral=True)
+                return
+
+            import re
+            from app.services.authz import link_discord_account
+
+            lines = [l.strip() for l in text.strip().splitlines() if l.strip()]
+            success = []
+            errors = []
+
+            for line in lines:
+                parts = re.split(r"[\s,;:]+", line, maxsplit=1)
+                if len(parts) < 2:
+                    errors.append(f"• Dòng sai định dạng: `{line}` (cần: email discord_id)")
+                    continue
+
+                part1, part2 = parts[0].strip(), parts[1].strip()
+                if "@" in part1 and not part1.startswith("<@"):
+                    email, target_raw = part1, part2
+                else:
+                    email, target_raw = part2, part1
+
+                cleaned_id = re.sub(r"[<@!>]", "", target_raw.strip())
+                if not cleaned_id.isdigit():
+                    errors.append(f"• Discord ID không hợp lệ: `{target_raw}` cho email `{email}`")
+                    continue
+
+                try:
+                    user = link_discord_account(session, email=email, discord_id=cleaned_id)
+                    success.append(f"• **{user.display_name}** (`{email}`) ➔ <@{cleaned_id}>")
+                except Exception as ex:
+                    errors.append(f"• Lỗi link `{email}`: {ex}")
+
+            report = [f"📋 **Kết quả nạp danh sách Discord ID ({len(success)}/{len(lines)} thành công):**"]
+            if success:
+                report.append("\n**Đã liên kết:**\n" + "\n".join(success[:15]))
+                if len(success) > 15:
+                    report.append(f"... và {len(success) - 15} người khác.")
+            if errors:
+                report.append("\n**Thất bại / Lỗi:**\n" + "\n".join(errors[:10]))
+
+            await interaction.followup.send("\n".join(report), ephemeral=True)
+        except NotAuthorized as e:
+            await interaction.followup.send(f"🔒 {e}", ephemeral=True)
+        except Exception:
+            log.exception("Link batch fail")
+            await interaction.followup.send("❌ Đã có lỗi xảy ra khi nạp danh sách.", ephemeral=True)
+        finally:
+            session.close()
+
 
 def _parse_list_my():
     from app.models.parsed_command import ParsedCommand
