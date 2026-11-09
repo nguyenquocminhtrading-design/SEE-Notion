@@ -669,12 +669,27 @@ def setup_commands(bot: SEENotionBot) -> None:
         finally:
             session.close()
 
+    async def _email_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+        from app.config import load_team
+        current_lower = current.strip().lower()
+        team = load_team()
+        choices = []
+        for u in team:
+            label = f"{u.get('display_name')} ({u.get('email')})"
+            email = u.get("email", "")
+            if not current_lower or current_lower in label.lower() or current_lower in email.lower():
+                choices.append(app_commands.Choice(name=label[:100], value=email))
+            if len(choices) >= 25:
+                break
+        return choices
+
     @bot.tree.command(name="link-user", description="[Admin] Liên kết Discord Account của thành viên với email sinh viên")
     @app_commands.describe(
-        target="Thành viên Discord cần link",
-        email="Email sinh viên (VGU) của thành viên trong danh bạ"
+        target="Tag @User (nếu cùng server) HOẶC nhập Discord User ID dạng số (nếu chưa vào server)",
+        email="Chọn hoặc nhập email sinh viên của bạn đó"
     )
-    async def link_user(interaction: discord.Interaction, target: discord.User, email: str):
+    @app_commands.autocomplete(email=_email_autocomplete)
+    async def link_user(interaction: discord.Interaction, target: str, email: str):
         await interaction.response.defer(ephemeral=True)
         session = get_session()
         try:
@@ -683,12 +698,32 @@ def setup_commands(bot: SEENotionBot) -> None:
                 await interaction.followup.send("🔒 Lệnh này chỉ dành cho Admin.", ephemeral=True)
                 return
 
+            # Xử lý target: có thể là mention <@123456>, <!@123456> hoặc ID thuần "123456"
+            import re
+            cleaned_target = re.sub(r"[<@!>]", "", target.strip())
+            if not cleaned_target.isdigit():
+                await interaction.followup.send(
+                    f"⚠️ Target không hợp lệ: `{target}`. Hãy tag `@User` hoặc paste Discord User ID (chuỗi 17-19 chữ số).",
+                    ephemeral=True
+                )
+                return
+
+            discord_user_id = cleaned_target
+            # Thử lấy thông tin user từ Discord API để hiển thị tên
+            user_label = f"<@{discord_user_id}> (`{discord_user_id}`)"
+            try:
+                discord_obj = await bot.fetch_user(int(discord_user_id))
+                if discord_obj:
+                    user_label = f"{discord_obj.mention} ({discord_obj.name} - `{discord_user_id}`)"
+            except Exception:
+                pass
+
             from app.services.authz import link_discord_account
-            updated_user = link_discord_account(session, email=email, discord_id=str(target.id))
+            updated_user = link_discord_account(session, email=email, discord_id=discord_user_id)
             await interaction.followup.send(
                 f"✅ Đã liên kết thành công:\n"
-                f"• Thành viên Discord: {target.mention} (`{target.id}`)\n"
-                f"• Tài khoản: **{updated_user.display_name}** ({updated_user.full_name})\n"
+                f"• Discord: {user_label}\n"
+                f"• Thành viên: **{updated_user.display_name}** ({updated_user.full_name})\n"
                 f"• Email: `{updated_user.email}`\n"
                 f"• Notion ID: `{updated_user.notion_user_id or '(chưa có)'}`\n\n"
                 f"Đã lưu vào cả cơ sở dữ liệu và file `team.yaml`.",
