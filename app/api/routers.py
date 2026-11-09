@@ -1,5 +1,6 @@
 """FastAPI routers — health + REST cơ bản (bot dùng service layer trực tiếp)."""
 import logging
+import secrets
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -13,7 +14,7 @@ log = logging.getLogger(__name__)
 
 def require_token(authorization: str = Header(default="")) -> None:
     expected = f"Bearer {get_settings().app_token}"
-    if authorization != expected:
+    if not secrets.compare_digest(authorization, expected):
         raise HTTPException(status_code=401, detail="Sai token")
 
 

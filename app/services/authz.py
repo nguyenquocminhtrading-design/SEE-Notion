@@ -1,6 +1,7 @@
 """AuthZ: map Discord ID -> user nội bộ, RBAC. Danh bạ seed từ team.yaml."""
 import json
 import logging
+import re
 from dataclasses import dataclass
 
 from sqlalchemy import select
@@ -95,12 +96,71 @@ def require_role(actor: Actor, *roles: str) -> None:
         raise NotAuthorized(f"Hành động này cần vai trò {' hoặc '.join(roles)}, bạn đang là {actor.role}.")
 
 
-def can_edit_task(actor: Actor, task: dict, users_by_notion_id: dict[str, User]) -> bool:
+def can_edit_task(actor: Actor, task: dict, users_by_notion_id: dict[str, User] | None = None) -> bool:
     """Admin sửa mọi task; member chỉ sửa task mình tạo hoặc được assign."""
     if actor.is_admin:
         return True
     assignee_ids = task.get("assignee_ids") or []
     if actor.user.notion_user_id and actor.user.notion_user_id in assignee_ids:
         return True
-    # creator của task chính là người đã tạo qua hệ thống — ghi trong audit (đơn giản: admin-only check MVP)
+    # creator_id lưu notion id người tạo
+    creator_id = task.get("creator_id")
+    if creator_id and actor.user.notion_user_id and actor.user.notion_user_id == creator_id:
+        return True
     return False
+
+
+def link_discord_account(session: Session, email: str, discord_id: str) -> User:
+    """Link discord_id với User qua email. Cập nhật cả DB và file team.yaml."""
+    from pathlib import Path
+    import yaml
+    from app.config import BASE_DIR
+
+    email_clean = email.strip().lower()
+    discord_id_clean = str(discord_id).strip()
+
+    # 1. Tìm user trong DB theo email
+    user = session.scalar(select(User).where(User.email.ilike(email_clean)))
+    if not user:
+        raise ValueError(f"Không tìm thấy người dùng với email: {email}")
+
+    # 2. Kiểm tra xem discord_id này đã được tài khoản khác dùng chưa
+    existing_discord = session.scalar(
+        select(User).where(User.discord_id == discord_id_clean, User.id != user.id)
+    )
+    if existing_discord:
+        raise ValueError(
+            f"Discord ID {discord_id_clean} đã được liên kết với tài khoản: {existing_discord.email} ({existing_discord.display_name})"
+        )
+
+    user.discord_id = discord_id_clean
+    session.commit()
+
+    # 3. Cập nhật trực tiếp vào team.yaml (giữ nguyên comment và định dạng)
+    team_yaml_path = BASE_DIR / "team.yaml"
+    if team_yaml_path.exists():
+        try:
+            content = team_yaml_path.read_text(encoding="utf-8")
+            # Tìm block của email này và cập nhật discord_id
+            pattern = rf'(email:\s*["\']?{re.escape(email_clean)}["\']?\s*\n\s*discord_id:\s*)["\']?[^"\']*["\']?'
+            if re.search(pattern, content, flags=re.IGNORECASE):
+                new_content = re.sub(
+                    pattern,
+                    rf'\g<1>"{discord_id_clean}"',
+                    content,
+                    flags=re.IGNORECASE,
+                )
+                team_yaml_path.write_text(new_content, encoding="utf-8")
+            else:
+                # Fallback dùng safe_load nếu regex không match
+                data = yaml.safe_load(content) or {}
+                for u in data.get("users", []):
+                    if str(u.get("email", "")).strip().lower() == email_clean:
+                        u["discord_id"] = discord_id_clean
+                        break
+                team_yaml_path.write_text(yaml.dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8")
+            log.info("Đã cập nhật discord_id=%s cho email=%s vào team.yaml", discord_id_clean, email_clean)
+        except Exception as e:
+            log.error("Không thể ghi cập nhật discord_id vào team.yaml: %s", e)
+
+    return user

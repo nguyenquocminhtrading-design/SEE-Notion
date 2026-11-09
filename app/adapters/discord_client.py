@@ -513,17 +513,9 @@ def setup_commands(bot: SEENotionBot) -> None:
                 except Exception as ex:
                     await interaction.followup.send(f"❌ Lỗi khi tải nội dung từ URL: {ex}")
                     return
-            elif os.path.exists(text_clean) and os.path.isfile(text_clean):
-                try:
-                    if text_clean.lower().endswith(".docx"):
-                        with open(text_clean, "rb") as f:
-                            docx_bytes = f.read()
-                            text = "__DOCX__"
-                    else:
-                        text = Path(text_clean).read_text(encoding="utf-8", errors="replace")
-                except Exception as ex:
-                    await interaction.followup.send(f"❌ Lỗi khi đọc file local: {ex}")
-                    return
+            elif text_clean:
+                # Không đọc file từ server path trực tiếp (chặn Arbitrary File Read)
+                text = text_clean
 
             actor = get_actor_by_discord_id(session, interaction.user.id)
             today = datetime.now(get_settings().business_tz).date()
@@ -674,6 +666,41 @@ def setup_commands(bot: SEENotionBot) -> None:
         except Exception:
             log.exception("Bulk create fail")
             await interaction.followup.send("❌ Đã có lỗi bất ngờ. Đã ghi log — thử lại sau.")
+        finally:
+            session.close()
+
+    @bot.tree.command(name="link-user", description="[Admin] Liên kết Discord Account của thành viên với email sinh viên")
+    @app_commands.describe(
+        target="Thành viên Discord cần link",
+        email="Email sinh viên (VGU) của thành viên trong danh bạ"
+    )
+    async def link_user(interaction: discord.Interaction, target: discord.User, email: str):
+        await interaction.response.defer(ephemeral=True)
+        session = get_session()
+        try:
+            actor = get_actor_by_discord_id(session, interaction.user.id)
+            if not actor.is_admin:
+                await interaction.followup.send("🔒 Lệnh này chỉ dành cho Admin.", ephemeral=True)
+                return
+
+            from app.services.authz import link_discord_account
+            updated_user = link_discord_account(session, email=email, discord_id=str(target.id))
+            await interaction.followup.send(
+                f"✅ Đã liên kết thành công:\n"
+                f"• Thành viên Discord: {target.mention} (`{target.id}`)\n"
+                f"• Tài khoản: **{updated_user.display_name}** ({updated_user.full_name})\n"
+                f"• Email: `{updated_user.email}`\n"
+                f"• Notion ID: `{updated_user.notion_user_id or '(chưa có)'}`\n\n"
+                f"Đã lưu vào cả cơ sở dữ liệu và file `team.yaml`.",
+                ephemeral=True
+            )
+        except NotAuthorized as e:
+            await interaction.followup.send(f"🔒 {e}", ephemeral=True)
+        except ValueError as e:
+            await interaction.followup.send(f"⚠️ {e}", ephemeral=True)
+        except Exception:
+            log.exception("Link user fail")
+            await interaction.followup.send("❌ Đã có lỗi xảy ra khi liên kết tài khoản.", ephemeral=True)
         finally:
             session.close()
 

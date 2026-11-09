@@ -14,6 +14,7 @@ from app.models.parsed_command import ParsedCommand
 from app.models.preview import ActionError, ClarifyError
 from app.models.task import CLOSED_STATUSES, validate_transition
 from app.services import validator as vld
+from app.services.authz import can_edit_task, NotAuthorized
 from app.services.parser import ParseError, ParserService
 from app.services.task_service import AmbiguousTask, TaskService
 
@@ -193,11 +194,16 @@ class CommandFlow:
             "change_deadline",
         }:
             task = await self._find_task(fields["task_ref"])
+            if not can_edit_task(actor, task):
+                raise NotAuthorized("Bạn chỉ có quyền cập nhật task do mình tạo hoặc được assign.")
+
             payload["task_ref_page_id"] = task["page_id"]
             payload["task_ref_title"] = task["title"]
             payload["task_ref_task_id"] = task.get("task_id")
             payload["task_status"] = task.get("status")
             payload["task_deadline"] = task.get("deadline")
+            payload["task_assignee_ids"] = task.get("assignee_ids") or []
+            payload["task_creator_id"] = task.get("creator_id")
 
             if parsed.intent == "complete_task":
                 payload["new_status"] = "Done"
@@ -354,7 +360,12 @@ class CommandFlow:
             "task_id": payload.get("task_ref_task_id"),
             "status": payload.get("task_status"),
             "deadline": payload.get("task_deadline"),
+            "assignee_ids": payload.get("task_assignee_ids") or [],
+            "creator_id": payload.get("task_creator_id"),
         }
+
+        if not can_edit_task(actor, task):
+            raise NotAuthorized("Bạn chỉ có quyền cập nhật task do mình tạo hoặc được assign.")
 
         if intent == "complete_task":
             await self.tasks.change_status(actor_name=actor.display_name, task=task, target="Done")
