@@ -411,8 +411,6 @@ class CommandFlow:
 
                 task = await self.tasks.create_task(
                     actor_name=actor.display_name,
-                    title=payload["title"], # Wait, it should be task_payload
-                    # Let's fix this properly
                     title=task_payload["title"],
                     assignee_users=assignees,
                     creator_notion_id=actor.user.notion_user_id or None,
