@@ -1,197 +1,126 @@
-```bash
-ssh seecodenotion@ssh-seecodenotion.alwaysdata.net
-```
-
 # SEE Notion — AI Task Handover & Deadline Management
 
-Bot Discord nhận lệnh **ngôn ngữ tự nhiên** → LLM parse → xác nhận → tạo task trong **Notion** → **email nhắc hạn** tự động (3 ngày trước / 1 ngày / đúng hạn / quá hạn).
+Hệ thống quản lý công việc và hạn chót cho CLB SEE: **Nhận lệnh ngôn ngữ tự nhiên từ Discord** ➔ **LLM phân tích ý định** ➔ **Xem trước & Xác nhận 2 bước** ➔ **Tự động đồng bộ lên Notion** ➔ **Nhắc hẹn đa kênh (Discord DM + Email)** tự động theo chu kỳ.
 
-> Kế hoạch đầy đủ: `notion-platform/docs/AI_TASK_HANDOVER_TECHNICAL_PLAN.md` (workspace ZCode)
+> 📖 **Xem tài liệu kỹ thuật & audit bảo mật chuyên sâu**: [`SYSTEM_ARCHITECTURE_AND_SECURITY_AUDIT.md`](./SYSTEM_ARCHITECTURE_AND_SECURITY_AUDIT.md)
 
 ---
 
-## Cấu trúc
+## 🚀 Tính năng nổi bật
+
+- 🤖 **Ra lệnh tự nhiên qua Discord**:
+  - Gõ lệnh như chat: *"Tạo task làm slide báo cáo cho Minh deadline thứ 6 tuần sau độ ưu tiên cao"*
+  - Hỗ trợ tạo task đơn, cập nhật deadline, đổi người phụ trách, hoàn thành việc.
+- 📑 **Nhập task hàng loạt từ biên bản họp (Meeting Minutes)**:
+  - Hỗ trợ import bảng Action Items từ file DOCX hoặc CSV/Text.
+- 🛡️ **Bảo mật & Phân quyền chặt chẽ (RBAC)**:
+  - Admin có toàn quyền điều phối.
+  - Member chỉ được sửa/đóng các task do mình tạo hoặc được giao cho mình.
+  - Xác thực token chống Timing Attack, chống Arbitrary File Read.
+- 👥 **Quản lý danh bạ thành viên linh hoạt**:
+  - Tự động map tài khoản Notion qua Email sinh viên VGU (`@student.vgu.edu.vn`).
+  - Lệnh Admin `/link-user` và `/link-batch` để gán Discord ID nhanh chóng.
+  - Lệnh `/sync-team` cập nhật danh bạ tức thì không cần restart máy chủ.
+- ⏰ **Nhắc việc thông minh (Automated Reminders)**:
+  - Tự động quét deadline mỗi 5 phút.
+  - Bắn thông báo trước 3 ngày, 1 ngày, đúng ngày và khi quá hạn qua Discord DM & Email.
+  - Cơ chế Deduplication chống spam lặp tin nhắn.
+
+---
+
+## 📂 Cấu trúc thư mục
 
 ```
 SEE Notion/
 ├── app/
-│   ├── main.py                  # Entry: FastAPI + Discord bot + APScheduler (1 process)
-│   ├── config.py                # Điểm đọc secret DUY NHẤT (env + .env)
-│   ├── container.py             # Dựng dependencies 1 lần
-│   ├── scheduler.py             # Cron quét reminder mỗi 5 phút
-│   ├── api/routers.py           # REST: /healthz /readyz /api/v1/tasks /api/v1/audit
-│   ├── db/                      # SQLite: users, pending_actions, notification_log, audit_log
-│   ├── models/                  # Domain: lifecycle, ParsedCommand, Preview
+│   ├── main.py                     # Entry point: FastAPI + Discord bot + APScheduler
+│   ├── config.py                   # Đọc biến môi trường (.env) & Pydantic settings
+│   ├── container.py                # Dependency Injection container
+│   ├── scheduler.py                # Cron job quét nhắc hạn định kỳ
+│   ├── api/
+│   │   └── routers.py              # REST API (/healthz, /readyz, /api/v1/tasks)
+│   ├── db/
+│   │   ├── models.py               # SQLAlchemy models (User, Nonce, AuditLog, NotificationLog)
+│   │   └── session.py              # Quản lý SQLite session engine
+│   ├── models/                     # Data models (ParsedCommand, Preview, Task)
 │   ├── adapters/
-│   │   ├── notion_gateway.py    # ĐIỂM DUY NHẤT gọi Notion (rate limit + retry + pagination)
-│   │   ├── llm/                 # GLM (chính) / Ollama (local, swap bằng env)
-│   │   ├── email/               # SMTP (Gmail App Password) / Resend
-│   │   └── discord_client.py    # Bot: /task, /my, nút ✅/❌ xác nhận
-│   └── services/                # parser, validator, confirmation, task_service, reminder_engine, authz
-├── tests/unit/                  # 46 unit test (lifecycle, validator, reminder, confirmation)
-├── team.yaml                    # Danh bạ team (bạn là admin duy nhất)
-├── config.yaml                  # Reminder rules, TTL, giới hạn
-└── .env                         # Secrets (đã copy từ .env.example — ĐIỀN GIÁ TRỊ THẬT)
+│   │   ├── discord_client.py       # Discord Bot Slash Commands & Interactive Views
+│   │   ├── notion_gateway.py       # Cầu nối Notion API (Rate-limit, Retry, Pagination)
+│   │   ├── llm/                    # OpenAI / GLM / Ollama Adapters
+│   │   └── email/                  # SMTP (Gmail) / Resend Adapters
+│   └── services/
+│       ├── command_flow.py         # Orchestrator điều phối luồng lệnh (Prepare -> Execute)
+│       ├── parser.py               # Phân tích cú pháp ngôn ngữ tự nhiên bằng LLM
+│       ├── validator.py            # Kiểm tra tính hợp lệ của ngày, assignee, priority
+│       ├── authz.py                # RBAC, phân quyền task và liên kết tài khoản
+│       ├── confirmation.py         # Quản lý mã Nonce cho tương tác xác nhận
+│       ├── reminder_engine.py      # Bộ máy tính toán lịch nhắc hẹn
+│       ├── task_service.py         # Nghiệp vụ quản lý Task ID (TSK-xxx) và Notion
+│       └── template_parser.py      # Trích xuất task từ bảng DOCX/CSV
+├── tests/unit/                     # Bộ kiểm thử 60 unit tests
+├── team.yaml                       # Danh bạ thành viên (Nguồn sự thật chính)
+├── config.yaml                     # Cấu hình luật nhắc hẹn, TTL, múi giờ
+├── .env.example                    # Mẫu khai báo biến môi trường
+└── README.md                       # Hướng dẫn sử dụng & vận hành
 ```
 
-## Các bước setup (làm đúng thứ tự)
+---
 
-### Bước 1 — Notion (5-10 phút)
+## 🛠️ Hướng dẫn lệnh Discord dành cho Admin & Member
 
-**A. Tạo Integration và lấy `NOTION_TOKEN`**
+| Lệnh | Người dùng | Chức năng |
+|---|---|---|
+| `/create` | Mọi người | Tạo task mới bằng form hoặc gõ lệnh tự nhiên |
+| `/my` | Mọi người | Xem danh sách các task đang mở được giao cho mình |
+| `/update` | Mọi người (Có RBAC) | Dời deadline, đổi status hoặc reassign task |
+| `/complete` | Mọi người (Có RBAC) | Đánh dấu hoàn thành task |
+| `/bulk-create` | Admin / Member | Nhập nhiều task từ bảng DOCX hoặc CSV |
+| `/link-user` | **Admin** | Liên kết 1 tài khoản Discord (`@mention` hoặc ID số) với Email |
+| `/link-batch` | **Admin** | Nạp danh sách liên kết hàng loạt (`email discord_id`) |
+| `/sync-team` | **Admin** | Đọc lại `team.yaml` và nạp vào DB ngay lập tức |
 
-1. Truy cập [Notion Integrations](https://www.notion.so/profile/integrations) (đăng nhập bằng tài khoản Notion của bạn).
-2. Bấm nút **New integration** (hoặc "Create new integration").
-3. Ở phần **Associated workspace**, chọn workspace bạn muốn dùng. Đặt tên (ví dụ: `SEE Notion Bot`).
-4. Ở phần **Capabilities**, tick chọn:
-   - *Read content, Update content, Insert content*.
-   - *Read user information including email addresses* (Rất quan trọng để gán Assignee).
-5. Bấm **Submit**. Sau khi tạo xong, copy chuỗi **Internal Integration Secret** (bắt đầu bằng `secret_...`). Đây chính là `NOTION_TOKEN` của bạn.
+---
 
-**B. Tạo Database và lấy `NOTION_DATABASE_ID`**
+## ⚙️ Hướng dẫn cài đặt & Triển khai
 
-1. Tạo một trang mới trong Notion, chọn kiểu **Table** (Database) và đặt tên là `Tasks`.
-2. Tạo **đúng các property sau** (Lưu ý: Type của property không đổi được sau khi tạo):| Property          | Type                                                                            |
-   | ----------------- | ------------------------------------------------------------------------------- |
-   | Name              | Title                                                                           |
-   | Status            | Status — options:`Pending, In Progress, In Review, Done, Blocked, Cancelled` |
-   | Assignee          | People                                                                          |
-   | Creator           | People                                                                          |
-   | Deadline          | Date                                                                            |
-   | Start Date        | Date                                                                            |
-   | Priority          | Select:`High, Medium, Low`                                                    |
-   | Description       | rich_text (Text)                                                                |
-   | Handover Notes    | rich_text (Text)                                                                |
-   | Handover Date     | Date                                                                            |
-   | Archived (system) | Checkbox                                                                        |
-   | Task ID (system)  | rich_text (Text)                                                                |
-3. Lấy Database ID: Mở Database dưới dạng Full Page. Nhìn lên thanh địa chỉ trình duyệt, copy đoạn mã gồm 32 ký tự nằm giữa dấu `/` và dấu `?v=`. Đó chính là `NOTION_DATABASE_ID`.
-   *(Ví dụ: `https://www.notion.so/workspace/1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p?v=...` -> ID là `1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p`)*
-
-**C. Cấp quyền cho Bot truy cập Database**
-
-1. Ở trang Database vừa tạo, bấm vào biểu tượng `•••` (dấu 3 chấm) ở góc trên bên phải.
-2. Chọn **Connections** (hoặc Add connections) -> Tìm tên Integration bạn vừa tạo (ví dụ `SEE Notion Bot`) và chọn nó.
-3. Bấm **Confirm**. (Nếu không làm bước này, API sẽ báo lỗi 404 Not Found).
-4. Tạo 2 view trong Notion (thủ công 1 lần): **Calendar** (theo Deadline) và **Quá hạn** (filter Deadline is before today ∧ Status ≠ Done/Cancelled).
-
-### Bước 2 — Discord Bot (5-10 phút)
-
-**A. Tạo Bot và lấy `DISCORD_BOT_TOKEN`**
-
-1. Truy cập [Discord Developer Portal](https://discord.com/developers/applications).
-2. Bấm **New Application** ở góc trên phải, đặt tên (ví dụ: `SEE Notion Bot`) và đồng ý các điều khoản.
-3. Ở menu bên trái, chọn **Bot**.
-4. Bấm **Reset Token** (hoặc Generate Token) -> Bấm **Yes, do it!**.
-5. Copy đoạn mã vừa hiện ra. Đây chính là `DISCORD_BOT_TOKEN`. (Lưu ý: Token này chỉ hiện 1 lần, hãy lưu ngay vào file `.env`).
-
-**B. Mời Bot vào Server của bạn**
-
-1. Ở menu bên trái, chọn **OAuth2** -> **URL Generator**.
-2. Trong phần **Scopes**, tick chọn `bot` và `applications.commands`.
-3. Trong phần **Bot Permissions** vừa hiện ra bên dưới, tick chọn:
-   - *Send Messages*
-   - *Read Message History*
-4. Kéo xuống dưới cùng, copy URL được tạo ra và dán vào thanh địa chỉ trình duyệt.
-5. Chọn Server bạn muốn thêm bot vào và bấm **Authorize**.
-
-**C. Lấy `DISCORD_GUILD_ID` và User ID**
-
-1. Bật **Developer Mode** trên Discord: Vào Cài đặt người dùng (biểu tượng bánh răng) -> **Advanced** (Nâng cao) -> Bật **Developer Mode** (Chế độ nhà phát triển).
-2. Lấy Server ID (`DISCORD_GUILD_ID`): Ra ngoài màn hình chính, chuột phải vào icon Server của bạn ở cột bên trái -> Chọn **Copy Server ID** (Sao chép ID Máy chủ).
-3. Lấy User ID của bạn: Chuột phải vào tên của bạn trong kênh chat -> Chọn **Copy User ID**. Điền ID này vào file `team.yaml`.
-
-### Bước 3 — GLM API key
-
-Lấy key từ https://z.ai (hoặc nền tảng GLM bạn dùng) → điền `LLM_API_KEY`.
-
-### Bước 4 — Gmail App Password (email nhắc hạn)
-
-Để bot có thể tự động gửi email nhắc nhở, bạn cần thiết lập SMTP của Gmail.
-
-1. **Bật xác minh 2 bước (2-Step Verification):**
-
-   - Đăng nhập vào tài khoản Google **dành cho bot** (khuyên dùng tài khoản riêng, không dùng email cá nhân chính).
-   - Truy cập [Google Account Security](https://myaccount.google.com/security).
-   - Tìm mục "2-Step Verification" và bật nó lên (làm theo hướng dẫn của Google để thêm số điện thoại).
-2. **Tạo App Password (Mật khẩu ứng dụng):**
-
-   - Sau khi bật xác minh 2 bước, truy cập trực tiếp link này: [App Passwords](https://myaccount.google.com/apppasswords).
-   - Đặt tên ứng dụng (ví dụ: `SEE Notion Bot`) và bấm **Create**.
-   - Google sẽ hiện ra một mật khẩu gồm 16 chữ cái trên nền vàng. Copy 16 ký tự này (không kèm khoảng trắng).
-   - Điền mật khẩu này vào biến `SMTP_PASS` trong file `.env`. **Tuyệt đối không dùng mật khẩu đăng nhập Gmail thông thường ở đây.**
-3. **Cấu hình .env:**
-
-   - `SMTP_USER` = email của bot (ví dụ: `bot-cua-ban@gmail.com`).
-   - `EMAIL_FROM` = Tên hiển thị người gửi (ví dụ: `SEE Notion Bot <bot-cua-ban@gmail.com>`).
-
-### Bước 5 — Điền .env + team.yaml
-
-- Copy từng giá trị vào `.env` (đang là placeholder).
-- `team.yaml`: điền tên/email/Discord ID của bạn. Mặc định **bạn là admin duy nhất**.
-- Đổi `APP_TOKEN` thành chuỗi ngẫu nhiên bất kỳ (bảo vệ REST API).
-
-### Bước 6 — Chạy
+### 1. Chuẩn bị môi trường
+Yêu cầu **Python 3.11+** (Khuyên dùng Python 3.13).
 
 ```bash
-cd "C:\Users\Acer\Desktop\My carrer\SEE Notion"
-.venv\Scripts\activate          # venv đã cài sẵn dependencies
-python -m app.main              # chạy app (FastAPI :8001 + bot + scheduler)
+# Tạo virtual environment
+python -m venv venv
+
+# Kích hoạt trên Windows
+.\venv\Scripts\activate
+# Hoặc trên Linux/macOS:
+source venv/bin/activate
+
+# Cài đặt thư viện phụ thuộc
+pip install -r requirements.txt
 ```
 
-Kiểm tra:
+### 2. Cấu hình file `.env`
+Tạo file `.env` từ `.env.example` và điền các khóa API:
+```ini
+NOTION_TOKEN=secret_xxx
+NOTION_DATABASE_ID=xxx
+DISCORD_BOT_TOKEN=xxx
+DISCORD_GUILD_ID=xxx
+OPENAI_API_KEY=xxx
+EMAIL_HOST=smtp.gmail.com
+EMAIL_USER=your_email@gmail.com
+EMAIL_PASSWORD=your_app_password
+APP_TOKEN=your_secure_bearer_token
+```
 
-- Terminal thấy `Bot online: ...` → bot đã vào server Discord.
-- Trình duyệt mở http://127.0.0.1:8001/readyz → `db: ok`; `notion` sẽ ok khi token thật.
-- Trên Discord gõ: `/create` hoặc `/task assign Minh, Cường làm báo cáo trước ngày 30/10/2026` → bot hiện preview → bấm ✅ → task xuất hiện trong Notion.
-- `/bulk-create` → tạo hàng loạt task từ biên bản họp (Meeting Minutes / TSV / Excel / CSV).
-- `/my` → xem task đang mở của bạn.
-
-### Chạy test
-
+### 3. Chạy kiểm thử (Unit Tests)
 ```bash
-.venv\Scripts\activate
-python -m pytest tests -q       # 46 unit tests, ~1 giây
+pytest
 ```
+*(Đảm bảo toàn bộ 60/60 tests đều passed).*
 
-## Các Slash Commands & Tính năng hỗ trợ
-
-| Slash Command / Lệnh NL      | Mô tả / Tính năng                                                                                                                                                                                         |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/create`                   | Tạo task mới với hỗ trợ gán nhiều người (`assignees`: `Minh, Cường, Hân`).                                                                                                                    |
-| `/bulk-create`              | Tạo hàng loạt task từ Meeting Minutes (Word/Excel/TSV, Bullet list, Bảng Markdown, CSV). Hỗ trợ dán text, truyền link URL (`http://...`), đính kèm file, hoặc đường dẫn file local server. |
-| `/update`                   | Cập nhật thông tin task (dời deadline, đổi người phụ trách, đổi ưu tiên...).                                                                                                                    |
-| `/complete`                 | Chuyển trạng thái task thành Done.                                                                                                                                                                        |
-| `/my`                       | Liệt kê các task đang mở của bạn.                                                                                                                                                                      |
-| `"Assign Minh, Cường..."` | Gán task cho nhiều người cùng lúc (tách bằng dấu phẩy `,`, từ `và`, dấu mũi tên `→`, hoặc ngoặc đơn).                                                                               |
-
-### Tính năng xử lý bảng Meeting Minutes / Action Items thông minh trong `/bulk-create`:
-
-- **Tự động nhận diện PIC (Owner)**:
-  - `"Minh / [PIC bổ sung]"` ➔ gán cho **Minh**.
-  - `"Ánh → Cường"` ➔ gán đồng thời cho **Ánh** và **Cường**.
-  - `"Hân (Minh)"` ➔ gán đồng thời cho **Hân** và **Minh**.
-- **Tự động nhận diện Deadline & Status**:
-  - `"Xong 6/10"` ➔ Trạng thái **Done**, hạn chót `06/10/2026`.
-  - `"Done"` / `"done"` ➔ Trạng thái **Done**.
-  - `"2 tuần"` ➔ Tự động tính hạn chót = **Hôm nay + 14 ngày**.
-  - `"[DD/MM]"` ➔ Mặc định trạng thái **Not started**.
-
-**An toàn:** mọi hành động ghi đều hiện preview + cần bấm ✅ (hết hạn 10 phút); LLM chỉ parse JSON, không tự thực thi; archive luôn cần xác nhận rõ ràng.
-
-## Reminder hoạt động thế nào
-
-Mỗi 5 phút, hệ thống quét task đang mở trong Notion. Với mỗi task, tính các rule trong `config.yaml` (−3 ngày, −1 ngày, đúng hạn, quá hạn 1/4/7 ngày). Chống gửi trùng bằng ràng buộc UNIQUE trong SQLite — restart bao nhiêu lần cũng không gửi lặp, không sót (quét lại cửa sổ 30 ngày quá khứ). Task Done/Cancelled tự ngừng nhận reminder. Đổi deadline → reminder tự tính lại theo hạn mới.
-
-## Cập nhật trên AlwaysData Server
-
+### 4. Khởi chạy Server
 ```bash
-# 1. SSH vào server AlwaysData
-ssh seecodenotion@ssh-seecodenotion.alwaysdata.net
-
-# 2. Chuyển vào thư mục và pull code mới nhất
-cd /home/seecodenotion/SEE-Notion
-git pull origin main
-
-# 3. Vào Dashboard AlwaysData -> Advanced -> Services -> Bấm Restart service SEE_Notion_Bot
+python -m app.main
 ```
+Ứng dụng sẽ khởi động cả FastAPI Server, Discord Bot và Scheduler nhắc việc trong 1 tiến trình.
