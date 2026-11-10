@@ -173,3 +173,4 @@ flowchart TD
    - Task và Deadline thực tế đều nằm an toàn trên Notion Cloud.
 3. **Giám sát log**:
    - Sử dụng lệnh `tail -f ~/admin/logs/uwsgi.log` (hoặc log Alwaysdata) để theo dõi các thông báo nhắc việc và hoạt động của bot.
+
