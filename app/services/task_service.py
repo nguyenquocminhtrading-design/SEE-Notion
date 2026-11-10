@@ -209,8 +209,6 @@ class TaskService:
 
     async def change_deadline(self, *, actor_name: str, task: dict, new_deadline: str) -> dict:
         start = task.get("start_date")
-        props = {"Date": {"date": {"start": start, "end": new_deadline}} if start else {"Date": {"date": {"start": new_deadline}}}}
-        # Wait, the dict logic above is wrong. Let me fix.
         props = {"Date": {"date": {"start": start, "end": new_deadline} if start else {"start": new_deadline}}}
         page = await self.gateway.update_task_page(task["page_id"], props)
         self._audit(

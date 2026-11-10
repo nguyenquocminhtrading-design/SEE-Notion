@@ -1,4 +1,4 @@
-"""Discord bot — lớp tiếp nhận MVP. Chỉ nhận lệnh + render; logic nằm ở services."""
+﻿"""Discord bot — lớp tiếp nhận MVP. Chỉ nhận lệnh + render; logic nằm ở services."""
 
 import logging
 from datetime import datetime
@@ -691,7 +691,7 @@ def setup_commands(bot: SEENotionBot) -> None:
     @app_commands.autocomplete(email=_email_autocomplete)
     async def link_user(interaction: discord.Interaction, target: str, email: str):
         await interaction.response.defer(ephemeral=True)
-        session = get_session()
+        session = _new_session()
         try:
             actor = get_actor_by_discord_id(session, interaction.user.id)
             if not actor.is_admin:
@@ -742,7 +742,7 @@ def setup_commands(bot: SEENotionBot) -> None:
     @bot.tree.command(name="sync-team", description="[Admin] Đọc lại team.yaml và đồng bộ toàn bộ danh bạ thành viên vào hệ thống")
     async def sync_team(interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
-        session = get_session()
+        session = _new_session()
         try:
             actor = get_actor_by_discord_id(session, interaction.user.id)
             if not actor.is_admin:
@@ -778,7 +778,7 @@ def setup_commands(bot: SEENotionBot) -> None:
     )
     async def link_batch(interaction: discord.Interaction, text: str):
         await interaction.response.defer(ephemeral=True)
-        session = get_session()
+        session = _new_session()
         try:
             actor = get_actor_by_discord_id(session, interaction.user.id)
             if not actor.is_admin:

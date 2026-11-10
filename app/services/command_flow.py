@@ -457,6 +457,16 @@ class CommandFlow:
 
     # ---------- Query (không cần xác nhận) ----------
 
+    @staticmethod
+    def _normalize_notion_id(uid: str | None) -> str:
+        """Normalize Notion user ID: có hoặc không có dấu gạch ngang đều khớp.
+
+        VD: '1ebd872b594c815d84d00002a121c87c' == '1ebd872b-594c-815d-84d0-0002a121c87c'
+        """
+        if not uid:
+            return ""
+        return uid.replace("-", "").lower()
+
     async def handle_query(self, parsed: ParsedCommand, *, actor, session: Session) -> dict:
         if parsed.intent == "list_my_tasks":
             if not actor.user.notion_user_id:
@@ -465,11 +475,16 @@ class CommandFlow:
                     "Tài khoản của bạn chưa link Notion user ID. Nhờ admin cập nhật team.yaml.",
                 )
             pages = await self.tasks.gateway.query_open_tasks()
+            # Parse một lần duy nhất (tránh double-parse)
+            all_tasks = [self.tasks.gateway.parse_task(p) for p in pages]
+            # So khớp Notion ID bất kể format có/không có dấu gạch ngang
+            my_norm = self._normalize_notion_id(actor.user.notion_user_id)
             mine = [
-                self.tasks.gateway.parse_task(p)
-                for p in pages
-                if actor.user.notion_user_id
-                in (self.tasks.gateway.parse_task(p).get("assignee_ids") or [])
+                t for t in all_tasks
+                if my_norm and my_norm in [
+                    self._normalize_notion_id(uid)
+                    for uid in (t.get("assignee_ids") or [])
+                ]
             ]
             if not mine:
                 return {

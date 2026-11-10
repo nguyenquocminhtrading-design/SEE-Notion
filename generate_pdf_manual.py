@@ -477,3 +477,4 @@ def build_pdf(filename="docs/DISCORD_BOT_MANUAL.pdf"):
 
 if __name__ == "__main__":
     build_pdf()
+

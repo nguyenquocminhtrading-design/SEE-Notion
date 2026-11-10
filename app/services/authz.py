@@ -13,6 +13,19 @@ from app.db.models import User
 log = logging.getLogger(__name__)
 
 
+def _ensure_uuid_format(uid: str) -> str:
+    """Chuyển Notion ID không có dấu gạch ngang → UUID chuẩn.
+
+    '1ebd872b594c815d84d00002a121c87c' → '1ebd872b-594c-815d-84d0-0002a121c87c'
+    ID đã có dấu gạch ngang thì giữ nguyên.
+    """
+    uid = uid.strip()
+    cleaned = uid.replace("-", "")
+    if len(cleaned) == 32:
+        return f"{cleaned[0:8]}-{cleaned[8:12]}-{cleaned[12:16]}-{cleaned[16:20]}-{cleaned[20:32]}"
+    return uid  # format không nhận ra → trả nguyên
+
+
 class NotAuthorized(Exception):
     pass
 
@@ -61,7 +74,7 @@ def seed_users_from_yaml(session: Session) -> int:
             # không xóa mất ID do sync_notion_users tự map ở lần chạy trước
             yaml_notion_id = str(entry.get("notion_user_id", "")).strip()
             if yaml_notion_id:
-                existing.notion_user_id = yaml_notion_id
+                existing.notion_user_id = _ensure_uuid_format(yaml_notion_id)
             existing.role = entry.get("role", "member")
             existing.prefs_json = json.dumps(prefs, ensure_ascii=False)
         else:
@@ -70,7 +83,7 @@ def seed_users_from_yaml(session: Session) -> int:
                 full_name=entry.get("full_name", "").strip(),
                 email=email,
                 discord_id=discord_id,
-                notion_user_id=entry.get("notion_user_id", "").strip(),
+                notion_user_id=_ensure_uuid_format(entry.get("notion_user_id", "").strip()),
                 role=entry.get("role", "member"),
                 prefs_json=json.dumps(prefs, ensure_ascii=False),
             ))

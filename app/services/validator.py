@@ -174,6 +174,7 @@ def build_preview_fields(parsed: ParsedCommand, today: date) -> tuple[dict, list
         "title": parsed.title,
         "description": parsed.description,
         "assignee_name_raw": parsed.assignee_name_raw,
+        "assignee_names_raw": parsed.assignee_names_raw,  # danh sách nhiều người
         "start_date": parsed.start_date,
         "deadline": deadline,
         "priority": priority,
